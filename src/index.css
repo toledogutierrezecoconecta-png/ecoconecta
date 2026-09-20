@@ -1,0 +1,95 @@
+@import 'tailwindcss';
+
+/* =========================================================
+   Sistema visual EcoConecta SCZ
+   Verde (principal) + tonos tierra (secundario) + grises.
+   Tokens declarados con @theme: Tailwind genera las clases
+   bg-marca-600, text-tierra-700, etc. automáticamente.
+   ========================================================= */
+@theme {
+  --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+
+  --color-marca-50: #eef7f1;
+  --color-marca-100: #d5ebdf;
+  --color-marca-200: #aed7c1;
+  --color-marca-300: #7dbc9c;
+  --color-marca-400: #4a9c74;
+  --color-marca-500: #1f7a4d;
+  --color-marca-600: #16613c;
+  --color-marca-700: #0f4a2d;
+  --color-marca-800: #0b3722;
+  --color-marca-900: #072618;
+
+  --color-tierra-50: #faf7f2;
+  --color-tierra-100: #f1e9dc;
+  --color-tierra-200: #e2d3ba;
+  --color-tierra-300: #cdb591;
+  --color-tierra-400: #b5946a;
+  --color-tierra-500: #9c7a4f;
+  --color-tierra-600: #7d5f3d;
+  --color-tierra-700: #5f4830;
+  --color-tierra-800: #453425;
+
+  --color-humo-50: #f8f9f8;
+  --color-humo-100: #f1f3f1;
+  --color-humo-200: #e4e8e5;
+  --color-humo-300: #cfd6d1;
+  --color-humo-400: #9aa6a0;
+  --color-humo-500: #6d7a74;
+  --color-humo-600: #4d5853;
+  --color-humo-700: #36403b;
+  --color-humo-800: #222a26;
+
+  --radius-xl2: 0.875rem;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-white text-humo-800 font-sans antialiased;
+  }
+
+  /* Foco visible y consistente en toda la app (accesibilidad). */
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    @apply outline-none ring-2 ring-marca-500 ring-offset-2 ring-offset-white;
+  }
+
+  /* En móvil, evita el zoom automático de iOS al enfocar un campo. */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+@layer utilities {
+  .contenedor {
+    @apply mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .trama-circular {
+    background-image:
+      radial-gradient(circle at 15% 20%, rgba(255, 255, 255, 0.07) 0, transparent 45%),
+      radial-gradient(circle at 85% 10%, rgba(174, 215, 193, 0.12) 0, transparent 40%),
+      radial-gradient(circle at 70% 90%, rgba(181, 148, 106, 0.14) 0, transparent 45%);
+  }
+
+  .aparece {
+    animation: aparecer 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+}
+
+@keyframes aparecer {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
