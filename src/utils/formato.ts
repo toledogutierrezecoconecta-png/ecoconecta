@@ -129,7 +129,8 @@ export function normalizar(texto: string): string {
 }
 
 function limpiarTelefono(telefono: string): string {
-  const soloDigitos = telefono.replace(/\D/g, '')
+  // String() defensivo: Google Sheets devuelve los teléfonos como número.
+  const soloDigitos = String(telefono ?? '').replace(/\D/g, '')
   if (soloDigitos.startsWith(PREFIJO_PAIS)) return soloDigitos
   return `${PREFIJO_PAIS}${soloDigitos}`
 }

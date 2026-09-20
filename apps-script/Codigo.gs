@@ -218,10 +218,16 @@ function listarPublicaciones() {
         publicacion[columna] = fila[indice]
       })
 
-      // Normaliza los tipos que la hoja puede devolver como texto o como fecha.
+      // Normaliza los tipos que la hoja devuelve.
+      //
+      // Google Sheets reinterpreta lo que guarda: "2026-09-20" vuelve como
+      // objeto Date y un teléfono como 70000000 vuelve como número, perdiendo
+      // los ceros a la izquierda. Sin esta normalización la web recibe datos
+      // con el tipo equivocado.
       publicacion.cantidad = Number(publicacion.cantidad) || 0
       publicacion.contactos = Number(publicacion.contactos) || 0
       publicacion.fotoId = null
+      publicacion.telefono = normalizarTelefono(publicacion.telefono)
       publicacion.fechaDisponible = formatearFecha(publicacion.fechaDisponible)
       publicacion.creadaEn = formatearMarcaTemporal(publicacion.creadaEn)
 
@@ -231,12 +237,49 @@ function listarPublicaciones() {
   return respuesta({ ok: true, publicaciones: publicaciones })
 }
 
+/**
+ * Detecta fechas de forma confiable.
+ *
+ * `instanceof Date` no siempre funciona con los objetos que devuelve
+ * SpreadsheetApp, así que se comprueba la forma del objeto.
+ */
+function esFecha(valor) {
+  return (
+    valor &&
+    typeof valor === 'object' &&
+    typeof valor.getTime === 'function' &&
+    !isNaN(valor.getTime())
+  )
+}
+
 function formatearFecha(valor) {
-  if (valor instanceof Date) return Utilities.formatDate(valor, 'GMT-4', 'yyyy-MM-dd')
-  return String(valor).slice(0, 10)
+  if (esFecha(valor)) return Utilities.formatDate(valor, 'GMT-4', 'yyyy-MM-dd')
+
+  var texto = String(valor)
+  // Ya viene en formato ISO: se recorta la parte de la fecha.
+  if (/^\d{4}-\d{2}-\d{2}/.test(texto)) return texto.slice(0, 10)
+
+  // Último recurso: se intenta interpretar el texto como fecha.
+  var interpretada = new Date(texto)
+  if (!isNaN(interpretada.getTime())) {
+    return Utilities.formatDate(interpretada, 'GMT-4', 'yyyy-MM-dd')
+  }
+
+  return ''
 }
 
 function formatearMarcaTemporal(valor) {
-  if (valor instanceof Date) return valor.toISOString()
+  if (esFecha(valor)) return valor.toISOString()
   return String(valor)
+}
+
+/** Devuelve el teléfono como texto, recuperando los ceros que Sheets descarta. */
+function normalizarTelefono(valor) {
+  if (valor === '' || valor === null || valor === undefined) return ''
+
+  var texto = String(valor)
+  // Sheets puede devolver 7.0000000E7 para números largos.
+  if (typeof valor === 'number') texto = valor.toFixed(0)
+
+  return texto
 }

@@ -13,7 +13,8 @@
  *
  * Los pasos para obtener la URL están en README.md.
  */
-export const URL_APPS_SCRIPT = ''
+export const URL_APPS_SCRIPT =
+  'https://script.google.com/macros/s/AKfycbwDuKUJpD4F_DteoVrY5Iq4UIyDVoeYlgB3DY1eoZCh6ZgIzUDvxRpoYC6VCIJSQoy24Q/exec'
 
 /**
  * Permite probar la conexión sin recompilar: si en la consola del navegador
