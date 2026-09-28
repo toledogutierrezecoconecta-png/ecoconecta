@@ -25,14 +25,39 @@ const PRIVADOS: Enlace[] = [
   { a: '/perfil', texto: 'Mi perfil' },
 ]
 
+/** A partir de cuántos píxeles de desplazamiento aparece el menú en la portada. */
+const UMBRAL_APARICION = 80
+
 export function Navbar() {
   const { usuario, cerrarSesion } = useAuth()
   const [abierto, setAbierto] = useState(false)
+  const [desplazado, setDesplazado] = useState(false)
   const ubicacion = useLocation()
   const navegar = useNavigate()
 
+  // En la portada el menú estorba la ilustración, así que arranca escondido y
+  // aparece apenas se baja. Al volver al tope vuelve a esconderse.
+  const esPortada = ubicacion.pathname === '/'
+
+  useEffect(() => {
+    if (!esPortada) {
+      setDesplazado(false)
+      return
+    }
+
+    const alDesplazar = () => setDesplazado(window.scrollY > UMBRAL_APARICION)
+
+    alDesplazar() // por si se entra con la página ya desplazada
+    window.addEventListener('scroll', alDesplazar, { passive: true })
+
+    return () => window.removeEventListener('scroll', alDesplazar)
+  }, [esPortada])
+
   // Al cambiar de página se cierra el menú móvil.
   useEffect(() => setAbierto(false), [ubicacion.pathname])
+
+  // Con el menú desplegado nunca se esconde: dejaría las opciones inalcanzables.
+  const escondido = esPortada && !desplazado && !abierto
 
   const enlaces = usuario ? PRIVADOS : PUBLICOS
 
@@ -47,7 +72,12 @@ export function Navbar() {
     }`
 
   return (
-    <header className="sticky top-0 z-40 border-b border-humo-200 bg-white/95 backdrop-blur">
+    <header
+      className={`z-40 border-b border-humo-200 bg-white/95 backdrop-blur transition-transform duration-300 ease-out ${
+        // En la portada va fijo para no dejar un hueco blanco cuando se esconde.
+        esPortada ? 'fixed inset-x-0 top-0' : 'sticky top-0'
+      } ${escondido ? '-translate-y-full' : 'translate-y-0'}`}
+    >
       <nav className="contenedor flex h-16 items-center justify-between gap-4">
         <Link to="/" className="flex items-center gap-2.5" aria-label="EcoConecta SCZ, ir al inicio">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-marca-600 text-white">
