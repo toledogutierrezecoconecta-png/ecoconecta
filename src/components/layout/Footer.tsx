@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { EMPRESA, WHATSAPP_SOPORTE } from '../../services/config'
 import { Icono } from '../ui/Icono'
+import logo from '../../assets/marca/logo.webp'
 
 const ENLACES = [
   { a: '/como-funciona', texto: 'Cómo funciona' },
@@ -18,14 +19,7 @@ export function Footer() {
       <div className="contenedor py-12">
         <div className="grid gap-10 md:grid-cols-[1.4fr_1fr]">
           <div>
-            <div className="flex items-center gap-2.5">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-marca-600 text-white">
-                <Icono nombre="reciclaje" className="h-5 w-5" />
-              </span>
-              <span className="text-lg font-extrabold tracking-tight text-humo-800">
-                EcoConecta <span className="text-marca-600">SCZ</span>
-              </span>
-            </div>
+            <img src={logo} alt="EcoConecta SCZ" className="h-12 w-auto" width={460} height={112} />
 
             <p className="mt-3 max-w-sm text-sm text-humo-600">
               Conectamos residuos con nuevas oportunidades. Lo que para un negocio es descarte,

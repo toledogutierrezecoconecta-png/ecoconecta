@@ -6,6 +6,7 @@ import { Icono } from '../components/ui/Icono'
 import { TIPOS_USUARIO } from '../data/catalogos'
 import { useAuth } from '../hooks/useAuth'
 import type { TipoUsuario } from '../types'
+import simbolo from '../assets/marca/simbolo.webp'
 
 type Modo = 'ingreso' | 'registro'
 
@@ -59,9 +60,7 @@ export function Acceso() {
     <div className="contenedor flex justify-center py-10 md:py-16">
       <div className="w-full max-w-md">
         <div className="mb-6 text-center">
-          <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-marca-600 text-white">
-            <Icono nombre="reciclaje" className="h-6 w-6" />
-          </span>
+          <img src={simbolo} alt="" className="mx-auto h-14 w-14" width={128} height={128} />
           <h1 className="mt-4 text-2xl font-extrabold tracking-tight text-humo-800">
             {modo === 'registro' ? 'Creá tu cuenta' : 'Ingresá a tu cuenta'}
           </h1>

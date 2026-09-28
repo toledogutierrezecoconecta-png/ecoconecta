@@ -3,6 +3,7 @@ import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { clasesBoton } from '../ui/Boton'
 import { Icono } from '../ui/Icono'
+import logo from '../../assets/marca/logo.webp'
 
 interface Enlace {
   a: string
@@ -80,12 +81,7 @@ export function Navbar() {
     >
       <nav className="contenedor flex h-16 items-center justify-between gap-4">
         <Link to="/" className="flex items-center gap-2.5" aria-label="EcoConecta SCZ, ir al inicio">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-marca-600 text-white">
-            <Icono nombre="reciclaje" className="h-5 w-5" />
-          </span>
-          <span className="text-lg font-extrabold tracking-tight text-humo-800">
-            EcoConecta <span className="text-marca-600">SCZ</span>
-          </span>
+          <img src={logo} alt="EcoConecta SCZ" className="h-11 w-auto" width={460} height={112} />
         </Link>
 
         <div className="hidden items-center gap-1 lg:flex">
