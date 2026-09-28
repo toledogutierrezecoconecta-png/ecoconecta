@@ -1,10 +1,74 @@
 import { Link } from 'react-router-dom'
+import { BotonPortada } from '../components/portada/BotonPortada'
+import type { MedidasBoton } from '../components/portada/BotonPortada'
 import { clasesBoton } from '../components/ui/Boton'
 import { Icono } from '../components/ui/Icono'
 import { ABREVIATURA_UNIDAD, TODOS_LOS_MATERIALES } from '../data/catalogos'
-import { FONDO_PORTADA, FOTO_MATERIAL } from '../data/imagenes'
+import { FOTO_MATERIAL, PORTADA_ESCRITORIO, PORTADA_MOVIL } from '../data/imagenes'
 import { buscarPrecio } from '../data/precios'
 import { formatearMonto } from '../utils/formato'
+
+/**
+ * Ubicación de los botones sobre cada ilustración, en porcentaje de la imagen.
+ *
+ * Los valores salen de medir los botones dibujados en el arte original
+ * (escritorio 1536x1024, móvil 940x1672). Al estar en porcentajes, quedan
+ * clavados en su lugar aunque la imagen cambie de tamaño.
+ */
+const UBICACION = {
+  escritorio: {
+    arriba: '35.16%',
+    alto: '9.38%',
+    ancho: '24.22%',
+    izquierdaClaro: '19.53%',
+    izquierdaOscuro: '56.25%',
+  },
+  movil: {
+    izquierda: '18.51%',
+    ancho: '62.98%',
+    alto: '8.01%',
+    arribaClaro: '31.94%',
+    arribaOscuro: '41.39%',
+  },
+} as const
+
+/** Tipografía e iconos en cqw: 1cqw = 1% del ancho de la ilustración. */
+const MEDIDAS_ESCRITORIO: MedidasBoton = {
+  alto: '100%',
+  espaciado: '1.6cqw',
+  icono: '2.7cqw',
+  flecha: '1.8cqw',
+  titulo: '1.7cqw',
+  subtitulo: '0.95cqw',
+  hueco: '1.05cqw',
+}
+
+const MEDIDAS_MOVIL: MedidasBoton = {
+  alto: '100%',
+  espaciado: '5cqw',
+  icono: '7cqw',
+  flecha: '5cqw',
+  titulo: '4.3cqw',
+  subtitulo: '2.6cqw',
+  hueco: '3.4cqw',
+}
+
+const ACCIONES = [
+  {
+    a: '/publicar',
+    icono: 'caja' as const,
+    titulo: 'Tengo material',
+    subtitulo: 'Quiero ofrecer un residuo',
+    tono: 'claro' as const,
+  },
+  {
+    a: '/explorar',
+    icono: 'buscar' as const,
+    titulo: 'Busco material',
+    subtitulo: 'Quiero encontrar un residuo',
+    tono: 'oscuro' as const,
+  },
+]
 
 /** Precio compacto bajo cada foto: "Bs. 1,80–2,50/L" o "Donación". */
 function precioCorto(materialId: string): string {
@@ -16,81 +80,80 @@ function precioCorto(materialId: string): string {
   }`
 }
 
-/**
- * Portada.
- *
- * Deliberadamente mínima: una pantalla completa con la propuesta en una frase
- * y dos caminos posibles. Todo lo demás —cómo funciona, precios, quiénes la
- * usan— vive en sus propias páginas, enlazadas desde el menú.
- */
 export function Landing() {
   return (
     <>
-      {/* ═══════════════════════════════════════════ Portada a pantalla completa */}
-      <section className="relative flex min-h-[calc(100svh-4rem)] items-center overflow-hidden">
+      {/*
+        El título y el lema viven dentro de la ilustración, así que se repiten
+        acá para los buscadores y los lectores de pantalla.
+      */}
+      <h1 className="sr-only">
+        EcoConecta SCZ — El residuo de un negocio puede ser la materia prima de otro
+      </h1>
+
+      {/* ════════════════════════════════════════════ Portada en escritorio */}
+      <section
+        className="relative hidden lg:block"
+        style={{ containerType: 'inline-size' }}
+        aria-label="Portada"
+      >
         <img
-          src={FONDO_PORTADA}
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover"
-          aria-hidden="true"
+          src={PORTADA_ESCRITORIO}
+          alt="EcoConecta SCZ conecta negocios que generan materiales aprovechables con recicladores de Santa Cruz de la Sierra"
+          className="block w-full"
+          fetchPriority="high"
         />
 
-        {/*
-          Dos capas: un tinte parejo de marca sobre la foto y, encima, un
-          degradado que oscurece el lado del texto. Deja ver la fotografía y
-          mantiene el contraste necesario para leer sobre ella.
-        */}
-        <div className="absolute inset-0 bg-marca-900/55" aria-hidden="true" />
-        <div
-          className="absolute inset-0 bg-gradient-to-r from-marca-900/90 via-marca-900/60 to-marca-900/25"
-          aria-hidden="true"
-        />
-
-        <div className="contenedor relative py-16 text-white">
-          <div className="aparece max-w-2xl">
-            <h1 className="text-[2.75rem] leading-[1.03] font-extrabold tracking-tight sm:text-6xl lg:text-7xl">
-              Tus residuos valen.
-              <br />
-              <span className="text-marca-200">Te decimos cuánto.</span>
-            </h1>
-
-            <p className="mt-6 max-w-lg text-lg text-marca-100/90 sm:text-xl">
-              Conectamos negocios con recicladores en Santa Cruz.
-            </p>
-
-            <div className="mt-10 flex flex-col gap-3 sm:flex-row">
-              <Link
-                to="/publicar"
-                className={`${clasesBoton('primario', 'lg')} bg-white !text-marca-700 shadow-xl shadow-marca-900/40 hover:bg-marca-50 sm:min-w-52`}
-              >
-                <Icono nombre="mas" className="h-5 w-5" />
-                Tengo material
-              </Link>
-
-              <Link
-                to="/explorar"
-                className={`${clasesBoton('contorno', 'lg')} border-white/40 !bg-transparent !text-white hover:!border-white hover:!bg-white/10 hover:!text-white sm:min-w-52`}
-              >
-                <Icono nombre="buscar" className="h-5 w-5" />
-                Busco material
-              </Link>
-            </div>
+        {ACCIONES.map((accion, indice) => (
+          <div
+            key={accion.a}
+            className="absolute"
+            style={{
+              top: UBICACION.escritorio.arriba,
+              height: UBICACION.escritorio.alto,
+              width: UBICACION.escritorio.ancho,
+              left:
+                indice === 0
+                  ? UBICACION.escritorio.izquierdaClaro
+                  : UBICACION.escritorio.izquierdaOscuro,
+            }}
+          >
+            <BotonPortada {...accion} medidas={MEDIDAS_ESCRITORIO} />
           </div>
-        </div>
-
-        {/* Señal de que la página continúa. */}
-        <a
-          href="#materiales"
-          className="absolute inset-x-0 bottom-6 mx-auto flex w-fit flex-col items-center gap-1 text-marca-100/70 transition-colors hover:text-white"
-          aria-label="Ver los materiales"
-        >
-          <span className="text-xs font-semibold tracking-wide uppercase">Ver materiales</span>
-          <Icono nombre="flecha" className="h-5 w-5 rotate-90" />
-        </a>
+        ))}
       </section>
 
-      {/* ═══════════════════════════════════════════════ Qué se compra, en fotos */}
-      <section className="contenedor scroll-mt-20 py-14 md:py-20" id="materiales">
+      {/* ═════════════════════════════════════════════════ Portada en móvil */}
+      <section
+        className="relative lg:hidden"
+        style={{ containerType: 'inline-size' }}
+        aria-label="Portada"
+      >
+        <img
+          src={PORTADA_MOVIL}
+          alt="EcoConecta SCZ conecta negocios que generan materiales aprovechables con recicladores de Santa Cruz de la Sierra"
+          className="block w-full"
+          fetchPriority="high"
+        />
+
+        {ACCIONES.map((accion, indice) => (
+          <div
+            key={accion.a}
+            className="absolute"
+            style={{
+              left: UBICACION.movil.izquierda,
+              width: UBICACION.movil.ancho,
+              height: UBICACION.movil.alto,
+              top: indice === 0 ? UBICACION.movil.arribaClaro : UBICACION.movil.arribaOscuro,
+            }}
+          >
+            <BotonPortada {...accion} medidas={MEDIDAS_MOVIL} />
+          </div>
+        ))}
+      </section>
+
+      {/* ═══════════════════════════════════════════════ Qué se compra acá */}
+      <section className="contenedor py-14 md:py-20" id="materiales">
         <h2 className="text-center text-2xl font-extrabold tracking-tight text-humo-800 sm:text-3xl">
           Qué se compra acá
         </h2>

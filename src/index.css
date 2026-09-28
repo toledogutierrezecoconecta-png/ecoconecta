@@ -40,6 +40,13 @@
   --color-humo-700: #36403b;
   --color-humo-800: #222a26;
 
+  /* Verdes tomados de la ilustración de portada, para que los botones
+     superpuestos coincidan exactamente con el arte. */
+  --color-portada-claro: #049e32;
+  --color-portada-claro-vivo: #05b539;
+  --color-portada-oscuro: #054c3f;
+  --color-portada-oscuro-vivo: #0a6553;
+
   --radius-xl2: 0.875rem;
 }
 

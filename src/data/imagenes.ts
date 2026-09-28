@@ -8,6 +8,8 @@ import metal from '../assets/materiales/metal.jpg'
 import pallets from '../assets/materiales/pallets.jpg'
 import plastico from '../assets/materiales/plastico.jpg'
 import poda from '../assets/materiales/poda.jpg'
+import portadaEscritorio from '../assets/portada/portada-escritorio.webp'
+import portadaMovil from '../assets/portada/portada-movil.webp'
 import textil from '../assets/materiales/textil.jpg'
 
 /**
@@ -35,6 +37,10 @@ export const FOTO_PORTADA = hero
 
 /** Fondo a pantalla completa de la portada: fardos de cartón listos para reciclar. */
 export const FONDO_PORTADA = fondoPortada
+
+/** Ilustraciones de portada. Los botones se superponen sobre ellas. */
+export const PORTADA_ESCRITORIO = portadaEscritorio
+export const PORTADA_MOVIL = portadaMovil
 
 export function fotoDeMaterial(materialId: string): string | undefined {
   return FOTO_MATERIAL[materialId]
