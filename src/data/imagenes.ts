@@ -1,6 +1,7 @@
 import aceite from '../assets/materiales/aceite.jpg'
 import cafe from '../assets/materiales/cafe.jpg'
 import carton from '../assets/materiales/carton.jpg'
+import fondoPortada from '../assets/materiales/fondo-portada.jpg'
 import frutas from '../assets/materiales/frutas.jpg'
 import hero from '../assets/materiales/hero.jpg'
 import metal from '../assets/materiales/metal.jpg'
@@ -31,6 +32,9 @@ export const FOTO_MATERIAL: Record<string, string> = {
 }
 
 export const FOTO_PORTADA = hero
+
+/** Fondo a pantalla completa de la portada: fardos de cartón listos para reciclar. */
+export const FONDO_PORTADA = fondoPortada
 
 export function fotoDeMaterial(materialId: string): string | undefined {
   return FOTO_MATERIAL[materialId]
