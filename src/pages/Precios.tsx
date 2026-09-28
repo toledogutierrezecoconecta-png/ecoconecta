@@ -4,6 +4,7 @@ import { Etiqueta } from '../components/ui/Etiqueta'
 import { Icono } from '../components/ui/Icono'
 import type { NombreIcono } from '../components/ui/Icono'
 import { TODOS_LOS_MATERIALES, buscarCategoria } from '../data/catalogos'
+import { FOTO_MATERIAL } from '../data/imagenes'
 import { PRECIOS_REFERENCIA, VIGENCIA_PRECIOS, buscarPrecio } from '../data/precios'
 import { formatearRangoReferencia } from '../utils/formato'
 
@@ -148,7 +149,17 @@ export function Precios() {
 
                   return (
                     <tr key={material.id} className="align-top">
-                      <td className="px-5 py-4 font-bold text-humo-800">{material.nombre}</td>
+                      <td className="px-5 py-4">
+                        <span className="flex items-center gap-3">
+                          <img
+                            src={FOTO_MATERIAL[material.id]}
+                            alt=""
+                            className="h-11 w-11 shrink-0 rounded-lg object-cover"
+                            loading="lazy"
+                          />
+                          <span className="font-bold text-humo-800">{material.nombre}</span>
+                        </span>
+                      </td>
                       <td className="px-5 py-4 text-sm text-humo-600">{categoria?.nombre}</td>
                       <td className="px-5 py-4">
                         {precio && precio.minimo !== null ? (
@@ -176,8 +187,16 @@ export function Precios() {
               return (
                 <li
                   key={precio.materialId}
-                  className="rounded-2xl border border-humo-200 bg-white p-5"
+                  className="flex gap-4 rounded-2xl border border-humo-200 bg-white p-5"
                 >
+                  <img
+                    src={FOTO_MATERIAL[precio.materialId]}
+                    alt=""
+                    className="h-16 w-16 shrink-0 rounded-xl object-cover"
+                    loading="lazy"
+                  />
+
+                  <div>
                   <p className="font-bold text-humo-800">{material?.nombre}</p>
 
                   {precio.minimo !== null ? (
@@ -190,7 +209,8 @@ export function Precios() {
                     </Etiqueta>
                   )}
 
-                  <p className="mt-2 text-sm text-humo-600">{precio.factores}</p>
+                    <p className="mt-2 text-sm text-humo-600">{precio.factores}</p>
+                  </div>
                 </li>
               )
             })}

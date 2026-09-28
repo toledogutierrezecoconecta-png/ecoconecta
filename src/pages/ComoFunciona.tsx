@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { clasesBoton } from '../components/ui/Boton'
 import { Icono } from '../components/ui/Icono'
 import type { NombreIcono } from '../components/ui/Icono'
+import { FOTO_PORTADA } from '../data/imagenes'
 import { EMPRESA, WHATSAPP_SOPORTE } from '../services/config'
 
 const OFERENTE: { icono: NombreIcono; titulo: string; detalle: string }[] = [
@@ -92,8 +93,15 @@ const PREGUNTAS = [
 export function ComoFunciona() {
   return (
     <div>
-      <section className="trama-circular bg-marca-800 py-16 text-white md:py-20">
-        <div className="contenedor max-w-3xl">
+      <section className="relative overflow-hidden bg-marca-800 py-16 text-white md:py-20">
+        <div
+          className="absolute inset-0 bg-cover bg-center opacity-25"
+          style={{ backgroundImage: `url(${FOTO_PORTADA})` }}
+          aria-hidden="true"
+        />
+        <div className="trama-circular absolute inset-0" aria-hidden="true" />
+
+        <div className="contenedor relative max-w-3xl">
           <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">Cómo funciona</h1>
           <p className="mt-4 text-lg text-marca-100/90">
             EcoConecta SCZ es un punto de encuentro entre quienes generan materiales aprovechables y

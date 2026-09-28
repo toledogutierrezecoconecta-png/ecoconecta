@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { fotoDeMaterial } from '../../data/imagenes'
 import { obtenerFoto } from '../../services/imagenes'
 import { Icono } from '../ui/Icono'
 import type { NombreIcono } from '../ui/Icono'
@@ -71,10 +72,14 @@ export function ImagenResiduo({
     }
   }, [fotoId])
 
-  if (foto) {
-    return <img src={foto} alt={titulo} className={`${className} object-cover`} loading="lazy" />
+  // Prioridad: la foto que subió el oferente, luego la foto del material.
+  const imagen = foto ?? fotoDeMaterial(materialId)
+
+  if (imagen) {
+    return <img src={imagen} alt={titulo} className={`${className} object-cover`} loading="lazy" />
   }
 
+  // Último recurso: ilustración propia, por si se agrega un material sin foto.
   return (
     <div
       className={`${className} flex items-center justify-center`}

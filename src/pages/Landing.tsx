@@ -4,31 +4,19 @@ import { clasesBoton } from '../components/ui/Boton'
 import { Etiqueta } from '../components/ui/Etiqueta'
 import { Icono } from '../components/ui/Icono'
 import type { NombreIcono } from '../components/ui/Icono'
-import { CATEGORIAS } from '../data/catalogos'
+import { ABREVIATURA_UNIDAD, TODOS_LOS_MATERIALES } from '../data/catalogos'
+import { FOTO_MATERIAL } from '../data/imagenes'
+import { buscarPrecio } from '../data/precios'
 import { INDICADORES_DEMO } from '../data/seed'
 import { usePublicaciones } from '../hooks/usePublicaciones'
+import { formatearMonto } from '../utils/formato'
 
+/** Los cuatro pasos, en una línea cada uno: se leen de un vistazo. */
 const PASOS: { icono: NombreIcono; titulo: string; detalle: string }[] = [
-  {
-    icono: 'etiqueta',
-    titulo: 'Publicá',
-    detalle: 'Cargá el material, la cantidad y la zona. El precio lo ponemos nosotros.',
-  },
-  {
-    icono: 'buscar',
-    titulo: 'Encontrá',
-    detalle: 'Los recolectores filtran por categoría y distrito, y ven qué hay cerca suyo.',
-  },
-  {
-    icono: 'telefono',
-    titulo: 'Conectá',
-    detalle: 'Se contactan directamente por WhatsApp para coordinar el retiro y las condiciones.',
-  },
-  {
-    icono: 'reciclaje',
-    titulo: 'Reutilizá',
-    detalle: 'El material vuelve a la cadena productiva en lugar de terminar en el relleno.',
-  },
+  { icono: 'etiqueta', titulo: 'Publicá', detalle: 'Qué tenés y cuánto' },
+  { icono: 'buscar', titulo: 'Encontrá', detalle: 'Filtrá por zona' },
+  { icono: 'telefono', titulo: 'Conectá', detalle: 'Por WhatsApp' },
+  { icono: 'reciclaje', titulo: 'Reutilizá', detalle: 'El material se aprovecha' },
 ]
 
 const PERFILES: { icono: NombreIcono; nombre: string }[] = [
@@ -36,7 +24,7 @@ const PERFILES: { icono: NombreIcono; nombre: string }[] = [
   { icono: 'gota', nombre: 'Cafeterías' },
   { icono: 'fabrica', nombre: 'Fábricas' },
   { icono: 'caja', nombre: 'Imprentas' },
-  { icono: 'tijera', nombre: 'Empresas textiles' },
+  { icono: 'tijera', nombre: 'Textileras' },
   { icono: 'reciclaje', nombre: 'Recicladores' },
   { icono: 'camion', nombre: 'Recolectores' },
   { icono: 'chispa', nombre: 'Artesanos' },
@@ -44,10 +32,20 @@ const PERFILES: { icono: NombreIcono; nombre: string }[] = [
 
 const ESTADISTICAS = [
   { valor: `+${INDICADORES_DEMO.publicaciones}`, etiqueta: 'publicaciones' },
-  { valor: `+${INDICADORES_DEMO.negocios}`, etiqueta: 'negocios registrados' },
+  { valor: `+${INDICADORES_DEMO.negocios}`, etiqueta: 'negocios' },
   { valor: `+${INDICADORES_DEMO.recolectores}`, etiqueta: 'recolectores' },
   { valor: `+${INDICADORES_DEMO.toneladas} t`, etiqueta: 'valorizadas' },
 ]
+
+/** Precio compacto para la galería: "Bs. 1,80–2,50/L" o "Donación". */
+function precioCorto(materialId: string): string {
+  const precio = buscarPrecio(materialId)
+  if (!precio || precio.minimo === null || precio.maximo === null) return 'Donación'
+
+  return `Bs. ${formatearMonto(precio.minimo)}–${formatearMonto(precio.maximo)}/${
+    ABREVIATURA_UNIDAD[precio.unidad]
+  }`
+}
 
 export function Landing() {
   const { publicaciones } = usePublicaciones()
@@ -55,237 +53,200 @@ export function Landing() {
 
   return (
     <>
-      {/* ---------------------------------------------------------- Hero */}
-      <section className="trama-circular relative overflow-hidden bg-marca-800 text-white">
-        <div className="contenedor grid gap-12 py-16 md:py-24 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+      {/* ═══════════════════════════════════════════════════════════ Hero */}
+      <section className="relative overflow-hidden bg-marca-800 text-white">
+        {/* En móvil la foto va de fondo; en escritorio, como mosaico al costado. */}
+        <div
+          className="absolute inset-0 bg-cover bg-center opacity-20 lg:hidden"
+          style={{ backgroundImage: `url(${FOTO_MATERIAL['carton-prensado']})` }}
+          aria-hidden="true"
+        />
+        <div className="trama-circular absolute inset-0" aria-hidden="true" />
+
+        <div className="contenedor relative grid gap-12 py-16 md:py-20 lg:grid-cols-[1fr_1fr] lg:items-center lg:py-24">
           <div className="aparece">
             <Etiqueta tono="blanco" className="mb-5">
               <Icono nombre="ubicacion" className="h-3.5 w-3.5" />
               Santa Cruz de la Sierra
             </Etiqueta>
 
-            <h1 className="text-4xl leading-[1.08] font-extrabold tracking-tight sm:text-5xl lg:text-6xl">
-              Convertí tus residuos en{' '}
-              <span className="text-marca-200">oportunidades.</span>
+            <h1 className="text-[2.6rem] leading-[1.05] font-extrabold tracking-tight sm:text-5xl lg:text-6xl">
+              Tus residuos valen.
+              <br />
+              <span className="text-marca-200">Nosotros te decimos cuánto.</span>
             </h1>
 
-            <p className="mt-5 max-w-xl text-lg text-marca-100/90">
-              Conectamos negocios que generan materiales aprovechables con recicladores,
-              recolectores y empresas que los necesitan.
+            <p className="mt-5 max-w-md text-lg text-marca-100/90">
+              Publicá los materiales que tu negocio desecha. Los recicladores los retiran.
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link
                 to="/publicar"
-                className={`${clasesBoton('primario', 'lg')} bg-white !text-marca-700 hover:bg-marca-50`}
+                className={`${clasesBoton('primario', 'lg')} bg-white !text-marca-700 shadow-lg shadow-marca-900/30 hover:bg-marca-50`}
               >
                 <Icono nombre="mas" className="h-5 w-5" />
-                Publicar un residuo
+                Tengo material
               </Link>
 
               <Link
                 to="/explorar"
-                className={`${clasesBoton('contorno', 'lg')} border-white/30 !bg-transparent !text-white hover:!border-white hover:!bg-white/10 hover:!text-white`}
+                className={`${clasesBoton('contorno', 'lg')} border-white/40 !bg-transparent !text-white hover:!border-white hover:!bg-white/10 hover:!text-white`}
               >
                 <Icono nombre="buscar" className="h-5 w-5" />
-                Buscar materiales
+                Busco material
               </Link>
             </div>
 
-            <dl className="mt-12 grid grid-cols-2 gap-6 border-t border-white/15 pt-8 sm:grid-cols-4">
+            <dl className="mt-10 grid grid-cols-4 gap-4 border-t border-white/15 pt-6">
               {ESTADISTICAS.map((estadistica) => (
                 <div key={estadistica.etiqueta}>
-                  <dt className="text-2xl font-extrabold text-white sm:text-3xl">
-                    {estadistica.valor}
-                  </dt>
-                  <dd className="mt-0.5 text-xs text-marca-100/80">{estadistica.etiqueta}</dd>
+                  <dt className="text-xl font-extrabold sm:text-2xl">{estadistica.valor}</dt>
+                  <dd className="text-[11px] text-marca-100/70">{estadistica.etiqueta}</dd>
                 </div>
               ))}
             </dl>
-
-            <p className="mt-4 text-xs text-marca-200/70">
-              * Cifras de demostración para esta versión de prueba.
-            </p>
           </div>
 
-          {/* Ilustración: el ciclo de la economía circular. */}
-          <div className="relative hidden lg:block">
-            <div className="rounded-3xl border border-white/15 bg-white/5 p-8 backdrop-blur-sm">
-              <p className="text-sm font-semibold tracking-wide text-marca-200 uppercase">
-                Ciclo EcoConecta SCZ
-              </p>
-
-              <ul className="mt-6 space-y-4">
-                {PASOS.map((paso, indice) => (
-                  <li key={paso.titulo} className="flex items-start gap-4">
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-marca-100">
-                      <Icono nombre={paso.icono} className="h-5 w-5" />
-                    </span>
-                    <div>
-                      <p className="font-bold text-white">
-                        {indice + 1}. {paso.titulo}
-                      </p>
-                      <p className="text-sm text-marca-100/80">{paso.detalle}</p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* -------------------------------------------------- Cómo funciona */}
-      <section className="contenedor py-16 md:py-20" id="como-funciona">
-        <div className="max-w-2xl">
-          <h2 className="text-3xl font-extrabold tracking-tight text-humo-800 sm:text-4xl">
-            ¿Cómo funciona?
-          </h2>
-          <p className="mt-3 text-humo-600">
-            Cuatro pasos simples. Sin intermediarios, sin trámites y sin costo para publicar.
-          </p>
-        </div>
-
-        <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {PASOS.map((paso, indice) => (
-            <div
-              key={paso.titulo}
-              className="rounded-2xl border border-humo-200 bg-white p-6 transition-colors hover:border-marca-300"
-            >
-              <div className="flex items-center justify-between">
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-marca-50 text-marca-600">
-                  <Icono nombre={paso.icono} className="h-5 w-5" />
-                </span>
-                <span className="text-3xl font-extrabold text-humo-200">0{indice + 1}</span>
-              </div>
-
-              <h3 className="mt-4 text-lg font-bold text-humo-800">{paso.titulo}</h3>
-              <p className="mt-1.5 text-sm text-humo-600">{paso.detalle}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ------------------------------------------ Precios de referencia */}
-      <section className="contenedor pb-16 md:pb-20">
-        <div className="overflow-hidden rounded-3xl border border-marca-200 bg-marca-50">
-          <div className="grid gap-8 p-8 md:grid-cols-[1.2fr_1fr] md:items-center md:p-12">
-            <div>
-              <Etiqueta tono="verde" className="mb-4">
-                <Icono nombre="chispa" className="h-3.5 w-3.5" />
-                Lo que nos hace distintos
-              </Etiqueta>
-
-              <h2 className="text-3xl leading-tight font-extrabold tracking-tight text-humo-800 sm:text-4xl">
-                No tenés que saber cuánto vale tu residuo.
-              </h2>
-
-              <p className="mt-4 text-humo-600">
-                Un restaurante no tiene por qué conocer el precio del aceite usado, ni una imprenta
-                el del recorte de papel. Por eso el precio no lo pone quien publica:{' '}
-                <strong className="text-humo-800">
-                  lo definimos nosotros junto a las empresas recicladoras
-                </strong>{' '}
-                de Santa Cruz, y lo actualizamos periódicamente.
-              </p>
-
-              <Link to="/precios" className={`${clasesBoton('primario', 'md')} mt-6`}>
-                Ver cómo definimos los precios
-                <Icono nombre="flecha" className="h-4 w-4" />
-              </Link>
-            </div>
-
-            {/* Ejemplo concreto: el cálculo que ve el oferente al publicar. */}
-            <div className="rounded-2xl border border-marca-200 bg-white p-6">
-              <p className="text-xs font-semibold tracking-wide text-humo-500 uppercase">Ejemplo</p>
-              <p className="mt-1 font-bold text-humo-800">80 litros de aceite usado</p>
-
-              <div className="mt-4 space-y-2 border-t border-humo-100 pt-4 text-sm">
-                <div className="flex justify-between gap-4">
-                  <span className="text-humo-600">Precio de referencia</span>
-                  <span className="font-semibold text-humo-800">Bs. 1,80 – 2,50/L</span>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <span className="text-humo-600">Cantidad publicada</span>
-                  <span className="font-semibold text-humo-800">80 litros</span>
-                </div>
-              </div>
-
-              <div className="mt-4 rounded-xl bg-marca-600 px-4 py-3 text-white">
-                <p className="text-xs font-semibold tracking-wide text-marca-100 uppercase">
-                  Valor estimado
-                </p>
-                <p className="text-2xl font-extrabold">Bs. 144 – 200</p>
-              </div>
-
-              <p className="mt-3 text-xs text-humo-500">
-                Antes ese aceite se tiraba. Valores de demostración.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ----------------------------------------------------- Categorías */}
-      <section className="bg-humo-50 py-16 md:py-20">
-        <div className="contenedor">
-          <div className="max-w-2xl">
-            <h2 className="text-3xl font-extrabold tracking-tight text-humo-800 sm:text-4xl">
-              ¿Qué materiales se publican?
-            </h2>
-            <p className="mt-3 text-humo-600">
-              Dos grandes categorías que cubren la mayoría de los residuos aprovechables de la
-              ciudad.
-            </p>
-          </div>
-
-          <div className="mt-10 grid gap-6 md:grid-cols-2">
-            {CATEGORIAS.map((categoria) => (
+          {/* Mosaico: se ve de inmediato con qué materiales trabaja la plataforma. */}
+          <div className="hidden grid-cols-2 gap-3 lg:grid">
+            {(
+              ['carton-prensado', 'retazos-plastico', 'retazos-textiles', 'chatarra-metalica'] as const
+            ).map((materialId, indice) => (
               <div
-                key={categoria.id}
-                className="rounded-2xl border border-humo-200 bg-white p-7"
+                key={materialId}
+                className={`overflow-hidden rounded-2xl ${indice % 3 === 0 ? 'mt-8' : ''}`}
               >
-                <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-marca-600 text-white">
-                  <Icono
-                    nombre={categoria.id === 'organicos' ? 'hoja' : 'fabrica'}
-                    className="h-6 w-6"
-                  />
-                </span>
-
-                <h3 className="mt-5 text-xl font-bold text-humo-800">{categoria.nombre}</h3>
-                <p className="mt-1.5 text-sm text-humo-600">{categoria.descripcion}</p>
-
-                <ul className="mt-5 flex flex-wrap gap-2">
-                  {categoria.materiales.map((material) => (
-                    <li key={material.id}>
-                      <Link
-                        to={`/explorar?material=${material.id}`}
-                        className="inline-block rounded-lg border border-humo-200 bg-humo-50 px-3 py-1.5 text-sm font-medium text-humo-700 transition-colors hover:border-marca-400 hover:bg-marca-50 hover:text-marca-700"
-                      >
-                        {material.nombre}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
+                <img
+                  src={FOTO_MATERIAL[materialId]}
+                  alt=""
+                  className="h-52 w-full object-cover transition-transform duration-500 hover:scale-105"
+                />
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* -------------------------------------------- Últimas publicaciones */}
-      {destacadas.length > 0 && (
-        <section className="contenedor py-16 md:py-20">
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <h2 className="text-3xl font-extrabold tracking-tight text-humo-800 sm:text-4xl">
-                Publicado recientemente
-              </h2>
-              <p className="mt-3 text-humo-600">Materiales disponibles ahora mismo en la ciudad.</p>
+      {/* ══════════════════════════════════════════════════════ Los 4 pasos */}
+      <section className="border-b border-humo-200 bg-white">
+        <div className="contenedor grid grid-cols-2 gap-6 py-10 md:grid-cols-4 md:py-12">
+          {PASOS.map((paso, indice) => (
+            <div key={paso.titulo} className="flex items-start gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-marca-50 text-marca-600">
+                <Icono nombre={paso.icono} className="h-5 w-5" />
+              </span>
+              <div>
+                <p className="text-xs font-bold text-humo-400">0{indice + 1}</p>
+                <p className="font-bold text-humo-800">{paso.titulo}</p>
+                <p className="text-sm text-humo-500">{paso.detalle}</p>
+              </div>
             </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════ Galería de materiales y precios */}
+      <section className="contenedor py-14 md:py-20">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h2 className="text-3xl font-extrabold tracking-tight text-humo-800 sm:text-4xl">
+              Qué se compra acá
+            </h2>
+            <p className="mt-2 text-humo-600">Precios de referencia, definidos por nosotros.</p>
+          </div>
+
+          <Link to="/precios" className={clasesBoton('contorno', 'md')}>
+            Cómo los calculamos
+            <Icono nombre="flecha" className="h-4 w-4" />
+          </Link>
+        </div>
+
+        <ul className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          {TODOS_LOS_MATERIALES.map((material) => (
+            <li key={material.id}>
+              <Link
+                to={`/explorar?material=${material.id}`}
+                className="group relative block aspect-4/5 overflow-hidden rounded-2xl"
+              >
+                <img
+                  src={FOTO_MATERIAL[material.id]}
+                  alt={material.nombre}
+                  className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                  loading="lazy"
+                />
+
+                {/* Degradado para que el texto sea legible sobre cualquier foto. */}
+                <span className="absolute inset-0 bg-gradient-to-t from-humo-800/90 via-humo-800/20 to-transparent" />
+
+                <span className="absolute inset-x-0 bottom-0 p-3">
+                  <span className="block text-sm leading-tight font-bold text-white">
+                    {material.nombre}
+                  </span>
+                  <span className="mt-0.5 block text-xs font-semibold text-marca-200">
+                    {precioCorto(material.id)}
+                  </span>
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {/* ══════════════════════════════════════════════ Ejemplo de valuación */}
+      <section className="bg-humo-50 py-14 md:py-20">
+        <div className="contenedor grid gap-10 md:grid-cols-2 md:items-center">
+          <div className="relative overflow-hidden rounded-3xl">
+            <img
+              src={FOTO_MATERIAL['aceite-vegetal']}
+              alt="Aceite vegetal usado de freidora"
+              className="h-72 w-full object-cover md:h-96"
+              loading="lazy"
+            />
+
+            {/* La cuenta sobre la foto: se entiende sin leer un párrafo. */}
+            <div className="absolute right-4 bottom-4 left-4 rounded-2xl bg-white/95 p-5 backdrop-blur">
+              <p className="text-xs font-semibold tracking-wide text-humo-500 uppercase">
+                80 litros de aceite usado
+              </p>
+              <p className="mt-1 text-3xl font-extrabold text-marca-700">Bs. 144 – 200</p>
+              <p className="mt-1 text-sm text-humo-600">Antes lo tirabas.</p>
+            </div>
+          </div>
+
+          <div>
+            <Etiqueta tono="verde" className="mb-4">
+              <Icono nombre="chispa" className="h-3.5 w-3.5" />
+              Lo que nos hace distintos
+            </Etiqueta>
+
+            <h2 className="text-3xl leading-tight font-extrabold tracking-tight text-humo-800 sm:text-4xl">
+              No tenés que saber cuánto vale.
+            </h2>
+
+            <p className="mt-4 text-lg text-humo-600">
+              El precio lo ponemos nosotros, con las recicladoras de la ciudad. Vos solo cargás
+              cuánto tenés.
+            </p>
+
+            <Link to="/publicar" className={`${clasesBoton('primario', 'lg')} mt-7`}>
+              Calcular lo que tengo
+              <Icono nombre="flecha" className="h-5 w-5" />
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* ═════════════════════════════════════════ Publicaciones recientes */}
+      {destacadas.length > 0 && (
+        <section className="contenedor py-14 md:py-20">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <h2 className="text-3xl font-extrabold tracking-tight text-humo-800 sm:text-4xl">
+              Disponible ahora
+            </h2>
 
             <Link to="/explorar" className={clasesBoton('contorno', 'md')}>
-              Ver todo el marketplace
+              Ver todo
               <Icono nombre="flecha" className="h-4 w-4" />
             </Link>
           </div>
@@ -298,106 +259,37 @@ export function Landing() {
         </section>
       )}
 
-      {/* ------------------------------------------------------- Perfiles */}
-      <section className="bg-humo-50 py-16 md:py-20" id="quienes">
+      {/* ═════════════════════════════════════════════════ Quiénes la usan */}
+      <section className="bg-humo-50 py-14 md:py-20" id="quienes">
         <div className="contenedor">
-          <div className="max-w-2xl">
-            <h2 className="text-3xl font-extrabold tracking-tight text-humo-800 sm:text-4xl">
-              ¿Quiénes pueden usar EcoConecta SCZ?
-            </h2>
-            <p className="mt-3 text-humo-600">
-              Cualquier negocio que genere materiales aprovechables y cualquier actor que los
-              necesite como insumo.
-            </p>
-          </div>
+          <h2 className="text-center text-3xl font-extrabold tracking-tight text-humo-800 sm:text-4xl">
+            Para quién es
+          </h2>
 
-          <ul className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <ul className="mx-auto mt-8 flex max-w-4xl flex-wrap justify-center gap-3">
             {PERFILES.map((perfil) => (
               <li
                 key={perfil.nombre}
-                className="flex flex-col items-center gap-3 rounded-2xl border border-humo-200 bg-white px-4 py-6 text-center transition-colors hover:border-marca-300"
+                className="flex items-center gap-2 rounded-full border border-humo-200 bg-white py-2.5 pr-5 pl-3 text-sm font-semibold text-humo-700"
               >
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-tierra-100 text-tierra-700">
-                  <Icono nombre={perfil.icono} className="h-5 w-5" />
+                <span className="text-marca-600">
+                  <Icono nombre={perfil.icono} className="h-4.5 w-4.5" />
                 </span>
-                <span className="text-sm font-semibold text-humo-700">{perfil.nombre}</span>
+                {perfil.nombre}
               </li>
             ))}
           </ul>
         </div>
       </section>
 
-      {/* --------------------------------------------------------- Impacto */}
-      <section className="contenedor py-16 md:py-20">
-        <div className="rounded-3xl border border-humo-200 bg-white p-8 md:p-12">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <h2 className="text-3xl font-extrabold tracking-tight text-humo-800 sm:text-4xl">
-              El impacto de EcoConecta SCZ
-            </h2>
-            <Etiqueta tono="ambar">
-              <Icono nombre="alerta" className="h-3.5 w-3.5" />
-              Datos de demostración
-            </Etiqueta>
-          </div>
+      {/* ══════════════════════════════════════════════════════ CTA final */}
+      <section className="relative overflow-hidden bg-marca-700 py-16 text-white md:py-20">
+        <div className="trama-circular absolute inset-0" aria-hidden="true" />
 
-          <p className="mt-3 max-w-2xl text-humo-600">
-            Estos indicadores se calcularán automáticamente a partir de las publicaciones
-            concretadas cuando la plataforma esté operativa.
-          </p>
-
-          <dl className="mt-9 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              {
-                valor: INDICADORES_DEMO.kilosValorizados.toLocaleString('es-BO'),
-                unidad: 'kg',
-                etiqueta: 'Residuos valorizados',
-                icono: 'balanza' as NombreIcono,
-              },
-              {
-                valor: INDICADORES_DEMO.litrosAceite.toLocaleString('es-BO'),
-                unidad: 'L',
-                etiqueta: 'Aceite recuperado',
-                icono: 'gota' as NombreIcono,
-              },
-              {
-                valor: String(INDICADORES_DEMO.concretadas),
-                unidad: '',
-                etiqueta: 'Publicaciones concretadas',
-                icono: 'check' as NombreIcono,
-              },
-              {
-                valor: String(INDICADORES_DEMO.negocios),
-                unidad: '',
-                etiqueta: 'Negocios conectados',
-                icono: 'tienda' as NombreIcono,
-              },
-            ].map((indicador) => (
-              <div key={indicador.etiqueta} className="border-l-2 border-marca-200 pl-4">
-                <span className="text-marca-600">
-                  <Icono nombre={indicador.icono} className="h-5 w-5" />
-                </span>
-                <dt className="mt-2 text-3xl font-extrabold text-humo-800">
-                  {indicador.valor}
-                  <span className="ml-1 text-lg text-humo-500">{indicador.unidad}</span>
-                </dt>
-                <dd className="mt-1 text-sm text-humo-600">{indicador.etiqueta}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-      </section>
-
-      {/* ------------------------------------------------------- CTA final */}
-      <section className="trama-circular bg-marca-700 py-16 text-white md:py-20">
-        <div className="contenedor text-center">
+        <div className="contenedor relative text-center">
           <h2 className="mx-auto max-w-3xl text-3xl leading-tight font-extrabold tracking-tight sm:text-4xl lg:text-5xl">
-            El residuo de un negocio puede ser la materia prima de otro.
+            El residuo de un negocio es la materia prima de otro.
           </h2>
-
-          <p className="mx-auto mt-5 max-w-xl text-marca-100/90">
-            Sumate a la red de economía circular de Santa Cruz. Publicar es gratis y toma menos de
-            dos minutos.
-          </p>
 
           <Link
             to="/acceso?modo=registro"
