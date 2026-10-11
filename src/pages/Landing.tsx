@@ -4,8 +4,14 @@ import type { MedidasBoton } from '../components/portada/BotonPortada'
 import { clasesBoton } from '../components/ui/Boton'
 import { Icono } from '../components/ui/Icono'
 import { ABREVIATURA_UNIDAD, TODOS_LOS_MATERIALES } from '../data/catalogos'
-import { FOTO_MATERIAL, PORTADA_ESCRITORIO, PORTADA_MOVIL } from '../data/imagenes'
+import {
+  FOTO_MATERIAL,
+  MEDIDAS_PORTADA,
+  PORTADA_ESCRITORIO,
+  PORTADA_MOVIL,
+} from '../data/imagenes'
 import { buscarPrecio } from '../data/precios'
+import { useMediaQuery } from '../hooks/useMediaQuery'
 import { formatearMonto } from '../utils/formato'
 
 /**
@@ -81,6 +87,10 @@ function precioCorto(materialId: string): string {
 }
 
 export function Landing() {
+  // Mismo corte que el prefijo lg: de Tailwind.
+  const esEscritorio = useMediaQuery('(min-width: 1024px)')
+  const medidasImagen = esEscritorio ? MEDIDAS_PORTADA.escritorio : MEDIDAS_PORTADA.movil
+
   return (
     <>
       {/*
@@ -91,16 +101,25 @@ export function Landing() {
         EcoConecta SCZ — El residuo de un negocio puede ser la materia prima de otro
       </h1>
 
-      {/* ════════════════════════════════════════════ Portada en escritorio */}
+      {/*
+        ═══════════════════════════════════════════════════════════ Portada
+        Se dibuja una sola ilustración, la que corresponde a la pantalla, y el
+        navegador descarga solo esa (antes bajaba las dos, ~250 KB de más).
+        No se usa <picture>: React le asigna la imagen al <img> antes de
+        agregar las alternativas, y el navegador termina bajando ambas.
+      */}
       <section
-        className="relative hidden lg:block"
+        key={esEscritorio ? 'escritorio' : 'movil'}
+        className="relative"
         style={{ containerType: 'inline-size' }}
         aria-label="Portada"
       >
         <img
-          src={PORTADA_ESCRITORIO}
+          src={esEscritorio ? PORTADA_ESCRITORIO : PORTADA_MOVIL}
+          width={medidasImagen.ancho}
+          height={medidasImagen.alto}
           alt="EcoConecta SCZ conecta negocios que generan materiales aprovechables con recicladores de Santa Cruz de la Sierra"
-          className="block w-full"
+          className="block h-auto w-full"
           fetchPriority="high"
         />
 
@@ -108,46 +127,29 @@ export function Landing() {
           <div
             key={accion.a}
             className="absolute"
-            style={{
-              top: UBICACION.escritorio.arriba,
-              height: UBICACION.escritorio.alto,
-              width: UBICACION.escritorio.ancho,
-              left:
-                indice === 0
-                  ? UBICACION.escritorio.izquierdaClaro
-                  : UBICACION.escritorio.izquierdaOscuro,
-            }}
+            style={
+              esEscritorio
+                ? {
+                    top: UBICACION.escritorio.arriba,
+                    height: UBICACION.escritorio.alto,
+                    width: UBICACION.escritorio.ancho,
+                    left:
+                      indice === 0
+                        ? UBICACION.escritorio.izquierdaClaro
+                        : UBICACION.escritorio.izquierdaOscuro,
+                  }
+                : {
+                    left: UBICACION.movil.izquierda,
+                    width: UBICACION.movil.ancho,
+                    height: UBICACION.movil.alto,
+                    top: indice === 0 ? UBICACION.movil.arribaClaro : UBICACION.movil.arribaOscuro,
+                  }
+            }
           >
-            <BotonPortada {...accion} medidas={MEDIDAS_ESCRITORIO} />
-          </div>
-        ))}
-      </section>
-
-      {/* ═════════════════════════════════════════════════ Portada en móvil */}
-      <section
-        className="relative lg:hidden"
-        style={{ containerType: 'inline-size' }}
-        aria-label="Portada"
-      >
-        <img
-          src={PORTADA_MOVIL}
-          alt="EcoConecta SCZ conecta negocios que generan materiales aprovechables con recicladores de Santa Cruz de la Sierra"
-          className="block w-full"
-          fetchPriority="high"
-        />
-
-        {ACCIONES.map((accion, indice) => (
-          <div
-            key={accion.a}
-            className="absolute"
-            style={{
-              left: UBICACION.movil.izquierda,
-              width: UBICACION.movil.ancho,
-              height: UBICACION.movil.alto,
-              top: indice === 0 ? UBICACION.movil.arribaClaro : UBICACION.movil.arribaOscuro,
-            }}
-          >
-            <BotonPortada {...accion} medidas={MEDIDAS_MOVIL} />
+            <BotonPortada
+              {...accion}
+              medidas={esEscritorio ? MEDIDAS_ESCRITORIO : MEDIDAS_MOVIL}
+            />
           </div>
         ))}
       </section>
