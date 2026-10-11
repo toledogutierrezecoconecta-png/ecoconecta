@@ -36,7 +36,7 @@ const PESTANAS: { valor: Pestana; texto: string }[] = [
  */
 export function Panel() {
   const { usuario } = useAuth()
-  const { publicaciones, cambiarEstado, eliminar } = usePublicaciones()
+  const { publicaciones, pendientes, cambiarEstado, eliminar } = usePublicaciones()
   const [parametros, setParametros] = useSearchParams()
 
   const mias = useMemo(
@@ -108,7 +108,12 @@ export function Panel() {
 
       <div className="mt-8">
         {vista === 'ofrezco' ? (
-          <PanelOferente mias={mias} cambiarEstado={cambiarEstado} eliminar={eliminar} />
+          <PanelOferente
+            mias={mias}
+            pendientes={pendientes}
+            cambiarEstado={cambiarEstado}
+            eliminar={eliminar}
+          />
         ) : (
           <PanelRecolector publicaciones={publicaciones} usuario={usuario} />
         )}
@@ -119,11 +124,12 @@ export function Panel() {
 
 interface PropsOferente {
   mias: Publicacion[]
+  pendientes: number
   cambiarEstado: (id: string, estado: EstadoPublicacion) => Promise<void>
   eliminar: (id: string) => Promise<void>
 }
 
-function PanelOferente({ mias, cambiarEstado, eliminar }: PropsOferente) {
+function PanelOferente({ mias, pendientes, cambiarEstado, eliminar }: PropsOferente) {
   const [pestana, setPestana] = useState<Pestana>('todas')
   const [aEliminar, setAEliminar] = useState<Publicacion | null>(null)
 
@@ -164,6 +170,19 @@ function PanelOferente({ mias, cambiarEstado, eliminar }: PropsOferente) {
 
   return (
     <>
+      {pendientes > 0 && (
+        <p
+          className="mb-6 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+          role="status"
+        >
+          <Icono nombre="reloj" className="mt-0.5 h-4 w-4 shrink-0" />
+          {pendientes === 1
+            ? 'Hay 1 cambio que todavía no llegó al marketplace compartido.'
+            : `Hay ${pendientes} cambios que todavía no llegaron al marketplace compartido.`}{' '}
+          Se reintenta solo cuando hay conexión; en este dispositivo ya se ven aplicados.
+        </p>
+      )}
+
       {resumen.potencial && (
         <section className="trama-circular mb-8 rounded-2xl bg-marca-700 p-6 text-white md:p-8">
           <div className="flex flex-wrap items-center justify-between gap-4">

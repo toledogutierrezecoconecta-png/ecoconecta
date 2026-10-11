@@ -27,6 +27,11 @@ async function conLimiteDeTiempo(peticion: (senal: AbortSignal) => Promise<Respo
   }
 }
 
+/**
+ * Devuelve true solo si la hoja confirmó el cambio. Un error del script
+ * (respuesta con ok: false) cuenta como fallo, así el cambio queda pendiente
+ * y se reintenta.
+ */
 async function enviar(accion: string, datos: Record<string, unknown>): Promise<boolean> {
   if (!haySheetsConfigurado()) return false
 
@@ -36,7 +41,14 @@ async function enviar(accion: string, datos: Record<string, unknown>): Promise<b
     const respuesta = await conLimiteDeTiempo((senal) =>
       fetch(obtenerUrlSheets(), { method: 'POST', body: cuerpo, signal: senal }),
     )
-    return respuesta.ok
+    if (!respuesta.ok) return false
+
+    const contenido = (await respuesta.json().catch(() => null)) as { ok?: boolean } | null
+    if (contenido?.ok === false) {
+      console.warn(`[EcoConecta SCZ] La hoja rechazó "${accion}".`, contenido)
+      return false
+    }
+    return true
   } catch (error) {
     console.warn(`[EcoConecta SCZ] No se pudo sincronizar "${accion}" con Google Sheets.`, error)
     return false
