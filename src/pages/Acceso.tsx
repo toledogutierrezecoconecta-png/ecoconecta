@@ -25,14 +25,21 @@ export function Acceso() {
     correo: '',
     clave: '',
   })
-  const [tipo, setTipo] = useState<TipoUsuario>('oferente')
+  // Al llegar desde "Guardar" o "Contactar" se vuelve a esa página después de
+  // ingresar. Solo se aceptan rutas internas, nunca una dirección externa.
+  const volver = parametros.get('volver') ?? ''
+
+  // Quien llega desde una publicación ajena viene a buscar materiales.
+  const [tipo, setTipo] = useState<TipoUsuario>(volver ? 'recolector' : 'oferente')
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState(false)
 
+  const destino = volver.startsWith('/') && !volver.startsWith('//') ? volver : '/panel'
+
   // Si ya hay sesión activa no tiene sentido mostrar el formulario.
   useEffect(() => {
-    if (usuario) navegar('/panel', { replace: true })
-  }, [usuario, navegar])
+    if (usuario) navegar(destino, { replace: true })
+  }, [usuario, navegar, destino])
 
   const cambiar = (campo: keyof typeof formulario, valor: string) =>
     setFormulario((actual) => ({ ...actual, [campo]: valor }))
@@ -48,7 +55,7 @@ export function Acceso() {
       } else {
         await iniciarSesion(formulario.correo, formulario.clave)
       }
-      navegar('/panel')
+      navegar(destino)
     } catch (problema) {
       setError(problema instanceof Error ? problema.message : 'No se pudo completar la operación.')
     } finally {

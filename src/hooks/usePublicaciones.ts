@@ -64,11 +64,6 @@ export function usePublicaciones() {
     [recargar],
   )
 
-  const restablecerDemostracion = useCallback(async () => {
-    repositorio.restablecerDemostracion()
-    await recargar()
-  }, [recargar])
-
   return {
     publicaciones,
     cargando,
@@ -78,6 +73,5 @@ export function usePublicaciones() {
     cambiarEstado,
     eliminar,
     contactar,
-    restablecerDemostracion,
   }
 }

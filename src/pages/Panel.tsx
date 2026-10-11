@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { Link, Navigate } from 'react-router-dom'
+import { Link, Navigate, useSearchParams } from 'react-router-dom'
+import { PanelRecolector } from '../components/panel/PanelRecolector'
 import { ImagenResiduo } from '../components/residuos/ImagenResiduo'
 import { Boton, clasesBoton } from '../components/ui/Boton'
 import { EtiquetaEstado } from '../components/ui/Etiqueta'
@@ -9,7 +10,7 @@ import { Modal } from '../components/ui/Modal'
 import { VIGENCIA_PRECIOS } from '../data/precios'
 import { useAuth } from '../hooks/useAuth'
 import { usePublicaciones } from '../hooks/usePublicaciones'
-import type { Publicacion, ValorEstimado } from '../types'
+import type { EstadoPublicacion, Publicacion, ValorEstimado } from '../types'
 import {
   formatearCantidad,
   formatearPrecio,
@@ -17,8 +18,10 @@ import {
   formatearValorEstimado,
   valorDePublicacion,
 } from '../utils/formato'
+import { buscaMateriales, puedePublicar } from '../utils/roles'
 
 type Pestana = 'todas' | 'disponible' | 'pausada' | 'concretada'
+type Vista = 'ofrezco' | 'busco'
 
 const PESTANAS: { valor: Pestana; texto: string }[] = [
   { valor: 'todas', texto: 'Todas' },
@@ -27,17 +30,102 @@ const PESTANAS: { valor: Pestana; texto: string }[] = [
   { valor: 'concretada', texto: 'Concretadas' },
 ]
 
+/**
+ * Panel del usuario. El oferente gestiona sus publicaciones, el recolector ve
+ * lo que guardó y a quién contactó, y quien hace las dos cosas cambia de vista.
+ */
 export function Panel() {
-  const { usuario, cargando: cargandoSesion } = useAuth()
-  const { publicaciones, cambiarEstado, eliminar, restablecerDemostracion } = usePublicaciones()
-  const [pestana, setPestana] = useState<Pestana>('todas')
-  const [aEliminar, setAEliminar] = useState<Publicacion | null>(null)
-  const [restablecer, setRestablecer] = useState(false)
+  const { usuario } = useAuth()
+  const { publicaciones, cambiarEstado, eliminar } = usePublicaciones()
+  const [parametros, setParametros] = useSearchParams()
 
   const mias = useMemo(
     () => publicaciones.filter((publicacion) => publicacion.usuarioId === usuario?.id),
     [publicaciones, usuario],
   )
+
+  if (!usuario) return <Navigate to="/acceso" replace />
+
+  // Un recolector que antes publicaba conserva el acceso a sus publicaciones.
+  const ofrece = puedePublicar(usuario.tipo) || mias.length > 0
+  const busca = buscaMateriales(usuario.tipo)
+  const vista: Vista = !ofrece || (busca && parametros.get('vista') === 'busco') ? 'busco' : 'ofrezco'
+
+  return (
+    <div className="contenedor py-8 md:py-12">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold text-marca-700">Hola, {usuario.contacto}</p>
+          <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-humo-800 sm:text-4xl">
+            {usuario.empresa}
+          </h1>
+          <p className="mt-2 text-humo-600">
+            {vista === 'ofrezco'
+              ? 'Gestioná tus publicaciones y seguí las consultas que recibís.'
+              : 'Tus publicaciones guardadas, los negocios que contactaste y lo nuevo en tu zona.'}
+          </p>
+        </div>
+
+        {vista === 'ofrezco' ? (
+          <Link to="/publicar" className={clasesBoton('primario', 'lg')}>
+            <Icono nombre="mas" className="h-5 w-5" />
+            Publicar nuevo residuo
+          </Link>
+        ) : (
+          <Link to="/explorar" className={clasesBoton('primario', 'lg')}>
+            <Icono nombre="buscar" className="h-5 w-5" />
+            Buscar materiales
+          </Link>
+        )}
+      </header>
+
+      {ofrece && busca && (
+        <div className="mt-8 inline-flex gap-1 rounded-xl bg-humo-100 p-1" role="tablist">
+          {(
+            [
+              { valor: 'ofrezco', texto: 'Lo que ofrezco', icono: 'etiqueta' },
+              { valor: 'busco', texto: 'Lo que busco', icono: 'buscar' },
+            ] as { valor: Vista; texto: string; icono: NombreIcono }[]
+          ).map((opcion) => (
+            <button
+              key={opcion.valor}
+              type="button"
+              role="tab"
+              aria-selected={vista === opcion.valor}
+              onClick={() =>
+                setParametros(opcion.valor === 'busco' ? { vista: 'busco' } : {}, { replace: true })
+              }
+              className={`inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-bold transition-colors ${
+                vista === opcion.valor ? 'bg-white text-humo-800 shadow-sm' : 'text-humo-500'
+              }`}
+            >
+              <Icono nombre={opcion.icono} className="h-4 w-4" />
+              {opcion.texto}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="mt-8">
+        {vista === 'ofrezco' ? (
+          <PanelOferente mias={mias} cambiarEstado={cambiarEstado} eliminar={eliminar} />
+        ) : (
+          <PanelRecolector publicaciones={publicaciones} usuario={usuario} />
+        )}
+      </div>
+    </div>
+  )
+}
+
+interface PropsOferente {
+  mias: Publicacion[]
+  cambiarEstado: (id: string, estado: EstadoPublicacion) => Promise<void>
+  eliminar: (id: string) => Promise<void>
+}
+
+function PanelOferente({ mias, cambiarEstado, eliminar }: PropsOferente) {
+  const [pestana, setPestana] = useState<Pestana>('todas')
+  const [aEliminar, setAEliminar] = useState<Publicacion | null>(null)
 
   const resumen = useMemo(() => {
     const disponibles = mias.filter((item) => item.estado === 'disponible')
@@ -67,9 +155,6 @@ export function Panel() {
 
   const visibles = pestana === 'todas' ? mias : mias.filter((item) => item.estado === pestana)
 
-  if (cargandoSesion) return null
-  if (!usuario) return <Navigate to="/acceso" replace />
-
   const tarjetas: { icono: NombreIcono; valor: number; etiqueta: string }[] = [
     { icono: 'etiqueta', valor: resumen.activas, etiqueta: 'Publicaciones activas' },
     { icono: 'check', valor: resumen.concretadas, etiqueta: 'Publicaciones concretadas' },
@@ -78,26 +163,9 @@ export function Panel() {
   ]
 
   return (
-    <div className="contenedor py-8 md:py-12">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-sm font-semibold text-marca-700">Hola, {usuario.contacto}</p>
-          <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-humo-800 sm:text-4xl">
-            {usuario.empresa}
-          </h1>
-          <p className="mt-2 text-humo-600">
-            Gestioná tus publicaciones y seguí las consultas que recibís.
-          </p>
-        </div>
-
-        <Link to="/publicar" className={clasesBoton('primario', 'lg')}>
-          <Icono nombre="mas" className="h-5 w-5" />
-          Publicar nuevo residuo
-        </Link>
-      </header>
-
+    <>
       {resumen.potencial && (
-        <section className="trama-circular mt-8 rounded-2xl bg-marca-700 p-6 text-white md:p-8">
+        <section className="trama-circular mb-8 rounded-2xl bg-marca-700 p-6 text-white md:p-8">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <p className="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-marca-200 uppercase">
@@ -125,7 +193,7 @@ export function Panel() {
         </section>
       )}
 
-      <section className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {tarjetas.map((tarjeta) => (
           <div key={tarjeta.etiqueta} className="rounded-2xl border border-humo-200 bg-white p-5">
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-marca-50 text-marca-600">
@@ -286,26 +354,6 @@ export function Panel() {
         )}
       </section>
 
-      {/* Herramienta de demostración: deja el marketplace como al inicio. */}
-      <section className="mt-12 rounded-2xl border border-tierra-200 bg-tierra-50 p-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h2 className="flex items-center gap-2 font-bold text-tierra-800">
-              <Icono nombre="alerta" className="h-4.5 w-4.5" />
-              Modo demostración
-            </h2>
-            <p className="mt-1 max-w-xl text-sm text-tierra-700">
-              Restablecé el marketplace a sus publicaciones de ejemplo. Útil antes de presentar la
-              plataforma. Esto elimina las publicaciones creadas en este navegador.
-            </p>
-          </div>
-
-          <Boton variante="contorno" onClick={() => setRestablecer(true)}>
-            Restablecer datos de ejemplo
-          </Boton>
-        </div>
-      </section>
-
       <Modal
         abierto={Boolean(aEliminar)}
         titulo="¿Eliminar esta publicación?"
@@ -332,32 +380,6 @@ export function Panel() {
           </Boton>
         </div>
       </Modal>
-
-      <Modal
-        abierto={restablecer}
-        titulo="¿Restablecer los datos de ejemplo?"
-        onCerrar={() => setRestablecer(false)}
-      >
-        <p className="text-sm text-humo-600">
-          Se recuperarán las publicaciones de demostración originales y se borrarán las que hayas
-          creado en este navegador. Tu cuenta no se elimina.
-        </p>
-
-        <div className="mt-6 flex flex-col gap-2 sm:flex-row-reverse">
-          <Boton
-            anchoCompleto
-            onClick={() => {
-              void restablecerDemostracion()
-              setRestablecer(false)
-            }}
-          >
-            Restablecer
-          </Boton>
-          <Boton variante="contorno" anchoCompleto onClick={() => setRestablecer(false)}>
-            Cancelar
-          </Boton>
-        </div>
-      </Modal>
-    </div>
+    </>
   )
 }

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { BotonGuardar } from '../components/residuos/BotonGuardar'
 import { ImagenResiduo } from '../components/residuos/ImagenResiduo'
 import { Boton, clasesBoton } from '../components/ui/Boton'
 import { Etiqueta, EtiquetaEstado } from '../components/ui/Etiqueta'
@@ -7,10 +8,10 @@ import { Icono, IconoWhatsApp } from '../components/ui/Icono'
 import { Modal } from '../components/ui/Modal'
 import { buscarCategoria, buscarMaterial } from '../data/catalogos'
 import { VIGENCIA_PRECIOS, buscarPrecio } from '../data/precios'
+import { useActividad } from '../hooks/useActividad'
 import { useAuth } from '../hooks/useAuth'
 import { usePublicaciones } from '../hooks/usePublicaciones'
 import {
-  enlaceCorreo,
   enlaceLlamada,
   enlaceWhatsApp,
   formatearCantidad,
@@ -26,6 +27,7 @@ export function DetalleResiduo() {
   const navegar = useNavigate()
   const { usuario } = useAuth()
   const { publicaciones, cargando, contactar } = usePublicaciones()
+  const { anotarContacto } = useActividad()
   const [modalAbierto, setModalAbierto] = useState(false)
 
   const publicacion = publicaciones.find((item) => item.id === id)
@@ -56,14 +58,16 @@ export function DetalleResiduo() {
   const categoria = buscarCategoria(publicacion.categoriaId)
   const material = buscarMaterial(publicacion.materialId)
   const esPropia = usuario?.id === publicacion.usuarioId
+  const esEjemplo = publicacion.origen === 'demo'
 
   // El precio no lo puso el oferente: sale de la tabla de referencia.
   const precioReferencia = buscarPrecio(publicacion.materialId)
   const valor = valorDePublicacion(publicacion)
 
+  // Cada persona suma un solo contacto, aunque abra la ventana varias veces.
   const abrirContacto = () => {
     setModalAbierto(true)
-    if (!esPropia) void contactar(publicacion.id)
+    if (!esPropia && anotarContacto(publicacion.id)) void contactar(publicacion.id)
   }
 
   const datos = [
@@ -112,6 +116,7 @@ export function DetalleResiduo() {
 
           <div className="mt-6 flex flex-wrap items-center gap-2">
             <EtiquetaEstado estado={publicacion.estado} />
+            {esEjemplo && <Etiqueta tono="ambar">Publicación de ejemplo</Etiqueta>}
             <Etiqueta tono="tierra">{categoria?.nombre}</Etiqueta>
             <Etiqueta tono="neutro">{publicacion.zona}</Etiqueta>
             <span className="text-xs text-humo-500">
@@ -119,9 +124,14 @@ export function DetalleResiduo() {
             </span>
           </div>
 
-          <h1 className="mt-4 text-3xl leading-tight font-extrabold tracking-tight text-humo-800 sm:text-4xl">
-            {publicacion.titulo}
-          </h1>
+          <div className="mt-4 flex items-start justify-between gap-4">
+            <h1 className="text-3xl leading-tight font-extrabold tracking-tight text-humo-800 sm:text-4xl">
+              {publicacion.titulo}
+            </h1>
+            <div className="shrink-0 pt-1">
+              <BotonGuardar publicacion={publicacion} estilo="normal" />
+            </div>
+          </div>
 
           <p className="mt-5 leading-relaxed whitespace-pre-line text-humo-600">
             {publicacion.descripcion}
@@ -220,6 +230,16 @@ export function DetalleResiduo() {
                   <Icono nombre="editar" className="h-5 w-5" />
                   Gestionar mi publicación
                 </Link>
+              ) : esEjemplo ? (
+                // Los teléfonos de los ejemplos son ficticios y podrían ser de
+                // personas reales: no se ofrece contactarlos.
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  <p className="font-bold">Esta es una publicación de ejemplo</p>
+                  <p className="mt-1">
+                    Muestra cómo se ve una oferta en EcoConecta SCZ. El negocio y sus datos de
+                    contacto son ficticios.
+                  </p>
+                </div>
               ) : publicacion.estado === 'disponible' ? (
                 <Boton tamano="lg" anchoCompleto onClick={abrirContacto}>
                   <Icono nombre="telefono" className="h-5 w-5" />
@@ -231,10 +251,12 @@ export function DetalleResiduo() {
                 </div>
               )}
 
-              <p className="mt-3 text-center text-xs text-humo-500">
-                {publicacion.contactos} {publicacion.contactos === 1 ? 'persona' : 'personas'} ya
-                consultaron por este material
-              </p>
+              {!esEjemplo && (
+                <p className="mt-3 text-center text-xs text-humo-500">
+                  {publicacion.contactos} {publicacion.contactos === 1 ? 'persona' : 'personas'} ya
+                  consultaron por este material
+                </p>
+              )}
             </div>
           </div>
 
@@ -259,7 +281,7 @@ export function DetalleResiduo() {
       >
         <div className="space-y-3">
           <a
-            href={enlaceWhatsApp(publicacion)}
+            href={enlaceWhatsApp(publicacion, usuario)}
             target="_blank"
             rel="noreferrer"
             className="flex items-center gap-3 rounded-xl border border-humo-200 p-4 transition-colors hover:border-marca-400 hover:bg-marca-50"
@@ -270,7 +292,9 @@ export function DetalleResiduo() {
             <span className="flex-1">
               <span className="block font-bold text-humo-800">WhatsApp</span>
               <span className="block text-sm text-humo-500">
-                Abre el chat con el mensaje ya escrito
+                {usuario
+                  ? `Abre el chat con un mensaje que te presenta como ${usuario.empresa}`
+                  : 'Abre el chat con el mensaje ya escrito'}
               </span>
             </span>
             <Icono nombre="flecha" className="h-5 w-5 text-humo-400" />
@@ -289,21 +313,20 @@ export function DetalleResiduo() {
             </span>
             <Icono nombre="flecha" className="h-5 w-5 text-humo-400" />
           </a>
-
-          <a
-            href={enlaceCorreo(publicacion)}
-            className="flex items-center gap-3 rounded-xl border border-humo-200 p-4 transition-colors hover:border-marca-400 hover:bg-marca-50"
-          >
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-humo-100 text-humo-600">
-              <Icono nombre="correo" className="h-5 w-5" />
-            </span>
-            <span className="flex-1">
-              <span className="block font-bold text-humo-800">Enviar mensaje</span>
-              <span className="block text-sm text-humo-500">Por correo electrónico</span>
-            </span>
-            <Icono nombre="flecha" className="h-5 w-5 text-humo-400" />
-          </a>
         </div>
+
+        {!usuario && (
+          <p className="mt-4 rounded-xl bg-humo-50 px-4 py-3 text-xs text-humo-600">
+            <Link
+              to={`/acceso?modo=registro&volver=${encodeURIComponent(`/residuo/${publicacion.id}`)}`}
+              className="font-semibold text-marca-700 hover:underline"
+            >
+              Creá una cuenta
+            </Link>{' '}
+            para presentarte con el nombre de tu empresa y llevar el registro de a quién
+            contactaste.
+          </p>
+        )}
 
         <p className="mt-5 text-xs text-humo-500">
           EcoConecta SCZ no participa en la negociación ni en el pago. El acuerdo se realiza

@@ -3,12 +3,13 @@ import { Navigate, useNavigate } from 'react-router-dom'
 import { Boton } from '../components/ui/Boton'
 import { CampoSelect, CampoTexto } from '../components/ui/Campo'
 import { Icono } from '../components/ui/Icono'
-import { TIPOS_USUARIO } from '../data/catalogos'
+import { TIPOS_USUARIO, ZONAS } from '../data/catalogos'
 import { useAuth } from '../hooks/useAuth'
 import type { TipoUsuario } from '../types'
+import { buscaMateriales } from '../utils/roles'
 
 export function Perfil() {
-  const { usuario, cargando, actualizarPerfil, cerrarSesion } = useAuth()
+  const { usuario, actualizarPerfil, cerrarSesion } = useAuth()
   const navegar = useNavigate()
   const [guardado, setGuardado] = useState(false)
 
@@ -17,9 +18,9 @@ export function Perfil() {
     contacto: usuario?.contacto ?? '',
     telefono: usuario?.telefono ?? '',
     tipo: (usuario?.tipo ?? 'oferente') as TipoUsuario,
+    zonaInteres: usuario?.zonaInteres ?? '',
   })
 
-  if (cargando) return null
   if (!usuario) return <Navigate to="/acceso" replace />
 
   const cambiar = (campo: keyof typeof formulario, valor: string) => {
@@ -38,7 +39,7 @@ export function Perfil() {
       <div className="w-full max-w-lg">
         <h1 className="text-3xl font-extrabold tracking-tight text-humo-800">Mi perfil</h1>
         <p className="mt-2 text-humo-600">
-          Estos datos son los que ven los interesados en tus publicaciones.
+          Estos datos son los que ven los negocios con los que te conectás.
         </p>
 
         <form
@@ -70,6 +71,7 @@ export function Perfil() {
 
           <CampoSelect
             etiqueta="Tipo de usuario"
+            ayuda="Define qué ves en tu panel y en el menú."
             value={formulario.tipo}
             onChange={(evento) => cambiar('tipo', evento.target.value)}
           >
@@ -79,6 +81,22 @@ export function Perfil() {
               </option>
             ))}
           </CampoSelect>
+
+          {buscaMateriales(formulario.tipo) && (
+            <CampoSelect
+              etiqueta="Zona donde trabajás"
+              ayuda="Tu panel te muestra primero lo que se publica en esta zona."
+              value={formulario.zonaInteres}
+              onChange={(evento) => cambiar('zonaInteres', evento.target.value)}
+            >
+              <option value="">Toda la ciudad</option>
+              {ZONAS.map((zona) => (
+                <option key={zona} value={zona}>
+                  {zona}
+                </option>
+              ))}
+            </CampoSelect>
+          )}
 
           <div className="rounded-xl bg-humo-50 px-4 py-3">
             <p className="text-xs font-semibold tracking-wide text-humo-500 uppercase">

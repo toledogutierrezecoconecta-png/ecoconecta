@@ -41,6 +41,7 @@ export type NombreIcono =
   | 'tienda'
   | 'chispa'
   | 'grafico'
+  | 'corazon'
 
 const TRAZOS: Record<NombreIcono, ReactNode> = {
   reciclaje: (
@@ -171,6 +172,9 @@ const TRAZOS: Record<NombreIcono, ReactNode> = {
   ),
   chispa: <path d="M12 3.5 13.8 9l5.7 1.8-5.7 1.8L12 18.5l-1.8-5.9L4.5 10.8 10.2 9z" />,
   grafico: <path d="M4 20V4M4 20h16M8 16V9M12.5 16v-4.5M17 16V7" />,
+  corazon: (
+    <path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.2a4.3 4.3 0 0 1 7.5 2.6C19.5 15.4 12 20 12 20Z" />
+  ),
 }
 
 interface PropsIcono {

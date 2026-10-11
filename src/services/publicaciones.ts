@@ -56,10 +56,17 @@ export async function listarPublicaciones(): Promise<Publicacion[]> {
   return ordenar(combinadas)
 }
 
+/**
+ * Las publicaciones reales van primero y las de ejemplo al final: las de
+ * ejemplo se fechan siempre "hace unos días" y si no taparían a las reales.
+ */
 function ordenar(publicaciones: Publicacion[]): Publicacion[] {
-  return [...publicaciones].sort(
-    (a, b) => new Date(b.creadaEn).getTime() - new Date(a.creadaEn).getTime(),
-  )
+  return [...publicaciones].sort((a, b) => {
+    const demoA = a.origen === 'demo' ? 1 : 0
+    const demoB = b.origen === 'demo' ? 1 : 0
+    if (demoA !== demoB) return demoA - demoB
+    return new Date(b.creadaEn).getTime() - new Date(a.creadaEn).getTime()
+  })
 }
 
 export async function obtenerPublicacion(id: string): Promise<Publicacion | undefined> {
@@ -134,9 +141,4 @@ export async function registrarContacto(id: string): Promise<void> {
   }
   guardarLocales(publicaciones)
   void sincronizarContacto(id)
-}
-
-/** Devuelve la demo a su estado original. Útil antes de una presentación. */
-export function restablecerDemostracion(): void {
-  guardarLocales(PUBLICACIONES_DEMO)
 }

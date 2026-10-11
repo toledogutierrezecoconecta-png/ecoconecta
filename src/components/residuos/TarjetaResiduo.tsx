@@ -10,6 +10,7 @@ import {
 } from '../../utils/formato'
 import { Etiqueta, EtiquetaEstado } from '../ui/Etiqueta'
 import { Icono } from '../ui/Icono'
+import { BotonGuardar } from './BotonGuardar'
 import { ImagenResiduo } from './ImagenResiduo'
 
 export function TarjetaResiduo({ publicacion }: { publicacion: Publicacion }) {
@@ -32,8 +33,18 @@ export function TarjetaResiduo({ publicacion }: { publicacion: Publicacion }) {
           {esDonacion && <Etiqueta tono="verde">Donación</Etiqueta>}
         </div>
 
+        {publicacion.origen === 'demo' && (
+          <div className="absolute bottom-3 left-3">
+            <Etiqueta tono="ambar">Publicación de ejemplo</Etiqueta>
+          </div>
+        )}
+
         <div className="absolute top-3 right-3">
           <EtiquetaEstado estado={publicacion.estado} />
+        </div>
+
+        <div className="absolute right-3 bottom-3">
+          <BotonGuardar publicacion={publicacion} />
         </div>
       </div>
 

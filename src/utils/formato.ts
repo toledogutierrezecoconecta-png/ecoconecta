@@ -2,7 +2,7 @@ import { ABREVIATURA_UNIDAD, UNIDAD_SINGULAR } from '../data/catalogos'
 import { buscarPrecio } from '../data/precios'
 import type { PrecioReferencia } from '../data/precios'
 import { PREFIJO_PAIS } from '../services/config'
-import type { Publicacion, Unidad, ValorEstimado } from '../types'
+import type { Publicacion, Unidad, Usuario, ValorEstimado } from '../types'
 
 /** Formatea un monto en bolivianos sin decimales innecesarios. */
 export function formatearMonto(monto: number): string {
@@ -135,10 +135,22 @@ function limpiarTelefono(telefono: string): string {
   return `${PREFIJO_PAIS}${soloDigitos}`
 }
 
-/** Enlace real de WhatsApp con el mensaje precargado. No requiere API. */
-export function enlaceWhatsApp(publicacion: Publicacion): string {
+/**
+ * Enlace real de WhatsApp con el mensaje precargado. No requiere API.
+ *
+ * Si quien contacta tiene sesión, el mensaje lo presenta con su nombre y su
+ * empresa: el oferente sabe de entrada con quién habla.
+ */
+export function enlaceWhatsApp(
+  publicacion: Publicacion,
+  remitente?: Pick<Usuario, 'contacto' | 'empresa'> | null,
+): string {
+  const presentacion = remitente
+    ? `soy ${remitente.contacto} de ${remitente.empresa}. Vi`
+    : 'vi'
+
   const mensaje =
-    `Hola ${publicacion.contacto}, vi su publicación de "${publicacion.titulo}" ` +
+    `Hola ${publicacion.contacto}, ${presentacion} su publicación de "${publicacion.titulo}" ` +
     `(${formatearCantidad(publicacion.cantidad, publicacion.unidad)}, ${publicacion.zona}) ` +
     `en EcoConecta SCZ y me interesa coordinar el retiro.`
 
@@ -149,7 +161,15 @@ export function enlaceLlamada(telefono: string): string {
   return `tel:+${limpiarTelefono(telefono)}`
 }
 
-export function enlaceCorreo(publicacion: Publicacion): string {
-  const asunto = `Consulta por ${publicacion.titulo} — EcoConecta SCZ`
-  return `mailto:?subject=${encodeURIComponent(asunto)}`
+/** "Hoy, 14:05" o "12 de octubre": cuándo se hizo un contacto. */
+export function formatearFechaHora(fechaIso: string): string {
+  const fecha = new Date(fechaIso)
+  if (Number.isNaN(fecha.getTime())) return ''
+
+  const hoy = new Date()
+  if (fecha.toDateString() === hoy.toDateString()) {
+    return `Hoy, ${fecha.toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' })}`
+  }
+
+  return fecha.toLocaleDateString('es-BO', { day: 'numeric', month: 'long' })
 }

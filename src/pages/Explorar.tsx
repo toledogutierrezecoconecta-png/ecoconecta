@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { TarjetaResiduo } from '../components/residuos/TarjetaResiduo'
 import { Boton, clasesBoton } from '../components/ui/Boton'
-import { Icono } from '../components/ui/Icono'
+import { Icono, IconoWhatsApp } from '../components/ui/Icono'
 import { CATEGORIAS, TODOS_LOS_MATERIALES, ZONAS } from '../data/catalogos'
 import { usePublicaciones } from '../hooks/usePublicaciones'
+import { WHATSAPP_SOPORTE } from '../services/config'
 import type { FiltrosExploracion } from '../types'
 import { normalizar, valorDePublicacion } from '../utils/formato'
 
@@ -24,12 +25,14 @@ export function Explorar() {
   const [filtros, setFiltros] = useState<FiltrosExploracion>(FILTROS_INICIALES)
   const [panelAbierto, setPanelAbierto] = useState(false)
 
-  // Permite llegar desde la landing con una categoría o material preseleccionado.
+  // Permite llegar desde la landing o el panel con una categoría, material o
+  // zona preseleccionados.
   useEffect(() => {
     const material = parametros.get('material') ?? ''
     const categoria = parametros.get('categoria') ?? ''
-    if (material || categoria) {
-      setFiltros((actuales) => ({ ...actuales, materialId: material, categoriaId: categoria }))
+    const zona = parametros.get('zona') ?? ''
+    if (material || categoria || zona) {
+      setFiltros((actuales) => ({ ...actuales, materialId: material, categoriaId: categoria, zona }))
     }
   }, [parametros])
 
@@ -259,17 +262,25 @@ export function Explorar() {
                 No encontramos materiales con esos filtros
               </h2>
               <p className="mx-auto mt-2 max-w-sm text-sm text-humo-600">
-                Probá ampliando la zona o quitando algún filtro. También podés publicar lo que
-                necesitás para que los negocios te encuentren.
+                Probá ampliando la zona o quitando algún filtro. ¿Buscás un material que nadie
+                ofrece todavía? Contanos qué necesitás y te ayudamos a encontrar quién lo genera.
               </p>
 
               <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
                 <Boton variante="contorno" onClick={limpiar}>
                   Limpiar filtros
                 </Boton>
-                <Link to="/publicar" className={clasesBoton('primario', 'md')}>
-                  Publicar un residuo
-                </Link>
+                <a
+                  href={`https://wa.me/${WHATSAPP_SOPORTE}?text=${encodeURIComponent(
+                    'Hola EcoConecta SCZ, estoy buscando este material: ',
+                  )}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={clasesBoton('primario', 'md')}
+                >
+                  <IconoWhatsApp className="h-5 w-5" />
+                  Contanos qué buscás
+                </a>
               </div>
             </div>
           ) : (

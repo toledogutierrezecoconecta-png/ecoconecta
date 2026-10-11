@@ -1,11 +1,10 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import * as servicioAuth from '../services/auth'
 import type { CredencialesRegistro, Usuario } from '../types'
 
 interface ContextoAuth {
   usuario: Usuario | null
-  cargando: boolean
   registrar: (credenciales: CredencialesRegistro) => Promise<Usuario>
   iniciarSesion: (correo: string, clave: string) => Promise<Usuario>
   cerrarSesion: () => void
@@ -14,15 +13,15 @@ interface ContextoAuth {
 
 const Contexto = createContext<ContextoAuth | null>(null)
 
-/** Mantiene la sesión viva entre recargas leyendo localStorage al montar. */
+/**
+ * Mantiene la sesión viva entre recargas.
+ *
+ * La sesión se lee de localStorage al crear el estado, no en un efecto: así
+ * ninguna pantalla se dibuja primero "sin usuario" (el perfil, por ejemplo,
+ * armaba su formulario vacío al recargar la página).
+ */
 export function ProveedorAuth({ children }: { children: ReactNode }) {
-  const [usuario, setUsuario] = useState<Usuario | null>(null)
-  const [cargando, setCargando] = useState(true)
-
-  useEffect(() => {
-    setUsuario(servicioAuth.obtenerSesion())
-    setCargando(false)
-  }, [])
+  const [usuario, setUsuario] = useState<Usuario | null>(() => servicioAuth.obtenerSesion())
 
   const registrar = useCallback(async (credenciales: CredencialesRegistro) => {
     const nuevo = await servicioAuth.registrar(credenciales)
@@ -47,8 +46,8 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
   }, [])
 
   const valor = useMemo(
-    () => ({ usuario, cargando, registrar, iniciarSesion, cerrarSesion, actualizarPerfil }),
-    [usuario, cargando, registrar, iniciarSesion, cerrarSesion, actualizarPerfil],
+    () => ({ usuario, registrar, iniciarSesion, cerrarSesion, actualizarPerfil }),
+    [usuario, registrar, iniciarSesion, cerrarSesion, actualizarPerfil],
   )
 
   return <Contexto.Provider value={valor}>{children}</Contexto.Provider>

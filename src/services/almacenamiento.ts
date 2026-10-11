@@ -15,6 +15,8 @@ export const CLAVES = {
   publicaciones: `${PREFIJO}publicaciones.v2`,
   usuarios: `${PREFIJO}usuarios.v1`,
   sesion: `${PREFIJO}sesion.v1`,
+  guardados: `${PREFIJO}guardados.v1`,
+  contactados: `${PREFIJO}contactados.v1`,
 } as const
 
 export function leer<T>(clave: string, porDefecto: T): T {

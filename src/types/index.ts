@@ -3,7 +3,7 @@
  *
  * Estas interfaces son el contrato entre la interfaz y la capa de servicios.
  * Al migrar de localStorage/Google Sheets a Supabase, PostgreSQL o una API REST
- * solo cambian los adaptadores de `services/storage`; estos tipos no se tocan.
+ * solo cambian los servicios de `services/`; estos tipos no se tocan.
  */
 
 export type TipoUsuario = 'oferente' | 'recolector' | 'ambos'
@@ -27,6 +27,8 @@ export interface Usuario {
   correo: string
   tipo: TipoUsuario
   creadoEn: string
+  /** Distrito donde trabaja el recolector; filtra las novedades de su panel. */
+  zonaInteres?: string
 }
 
 /** Lo que se guarda localmente: el usuario más el hash de su contraseña. */

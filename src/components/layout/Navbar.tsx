@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
+import type { TipoUsuario } from '../../types'
+import { puedePublicar } from '../../utils/roles'
 import { clasesBoton } from '../ui/Boton'
 import { Icono } from '../ui/Icono'
 import logo from '../../assets/marca/logo.webp'
@@ -18,13 +20,16 @@ const PUBLICOS: Enlace[] = [
   { a: '/como-funciona', texto: 'Cómo funciona' },
 ]
 
-const PRIVADOS: Enlace[] = [
-  { a: '/explorar', texto: 'Explorar' },
-  { a: '/publicar', texto: 'Publicar' },
-  { a: '/panel', texto: 'Mis publicaciones' },
-  { a: '/precios', texto: 'Precios' },
-  { a: '/perfil', texto: 'Mi perfil' },
-]
+/** El menú de quien tiene sesión depende de si publica, busca o hace las dos cosas. */
+function enlacesPrivados(tipo: TipoUsuario): Enlace[] {
+  return [
+    { a: '/explorar', texto: 'Explorar' },
+    ...(puedePublicar(tipo) ? [{ a: '/publicar', texto: 'Publicar' }] : []),
+    { a: '/panel', texto: tipo === 'oferente' ? 'Mis publicaciones' : 'Mi panel' },
+    { a: '/precios', texto: 'Precios' },
+    { a: '/perfil', texto: 'Mi perfil' },
+  ]
+}
 
 /** A partir de cuántos píxeles de desplazamiento aparece el menú en la portada. */
 const UMBRAL_APARICION = 80
@@ -60,7 +65,7 @@ export function Navbar() {
   // Con el menú desplegado nunca se esconde: dejaría las opciones inalcanzables.
   const escondido = esPortada && !desplazado && !abierto
 
-  const enlaces = usuario ? PRIVADOS : PUBLICOS
+  const enlaces = usuario ? enlacesPrivados(usuario.tipo) : PUBLICOS
 
   const salir = () => {
     cerrarSesion()

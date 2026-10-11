@@ -9,7 +9,9 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist"
+    "deploy": "gh-pages -d dist",
+    "sheets:subir": "clasp push --force",
+    "sheets:publicar": "clasp push --force && clasp deploy -i AKfycbwDuKUJpD4F_DteoVrY5Iq4UIyDVoeYlgB3DY1eoZCh6ZgIzUDvxRpoYC6VCIJSQoy24Q -d \"Actualizacion desde el proyecto\""
   },
   "dependencies": {
     "react": "^19.2.8",

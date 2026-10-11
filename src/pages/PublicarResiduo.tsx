@@ -4,6 +4,7 @@ import { ImagenResiduo } from '../components/residuos/ImagenResiduo'
 import { Boton, clasesBoton } from '../components/ui/Boton'
 import { CampoArea, CampoSelect, CampoTexto } from '../components/ui/Campo'
 import { Icono } from '../components/ui/Icono'
+import type { NombreIcono } from '../components/ui/Icono'
 import { CATEGORIAS, FRECUENCIAS, UNIDADES, ZONAS } from '../data/catalogos'
 import { buscarPrecio, esSoloDonacion } from '../data/precios'
 import { useAuth } from '../hooks/useAuth'
@@ -16,6 +17,7 @@ import {
   formatearRangoReferencia,
   formatearValorEstimado,
 } from '../utils/formato'
+import { puedePublicar } from '../utils/roles'
 
 interface Formulario {
   titulo: string
@@ -31,9 +33,15 @@ interface Formulario {
   fechaDisponible: string
 }
 
-const HOY = new Date().toISOString().slice(0, 10)
+/** Fecha de hoy en la hora local: toISOString usa UTC y de noche ya marca mañana. */
+function hoyLocal(): string {
+  const ahora = new Date()
+  const mes = String(ahora.getMonth() + 1).padStart(2, '0')
+  const dia = String(ahora.getDate()).padStart(2, '0')
+  return `${ahora.getFullYear()}-${mes}-${dia}`
+}
 
-const INICIAL: Formulario = {
+const INICIAL: Omit<Formulario, 'fechaDisponible'> = {
   titulo: '',
   categoriaId: 'organicos',
   materialId: 'aceite-vegetal',
@@ -44,18 +52,19 @@ const INICIAL: Formulario = {
   zona: 'DM-1',
   direccion: '',
   modalidadPrecio: 'referencia',
-  fechaDisponible: HOY,
 }
+
+const formularioNuevo = (): Formulario => ({ ...INICIAL, fechaDisponible: hoyLocal() })
 
 export function PublicarResiduo() {
   const navegar = useNavigate()
   const [parametros] = useSearchParams()
   const idEdicion = parametros.get('editar')
 
-  const { usuario, cargando: cargandoSesion } = useAuth()
-  const { publicaciones, crear, actualizar } = usePublicaciones()
+  const { usuario } = useAuth()
+  const { publicaciones, cargando, crear, actualizar } = usePublicaciones()
 
-  const [formulario, setFormulario] = useState<Formulario>(INICIAL)
+  const [formulario, setFormulario] = useState<Formulario>(formularioNuevo)
   const [fotoPrevia, setFotoPrevia] = useState<string | null>(null)
   const [fotoIdActual, setFotoIdActual] = useState<string | null>(null)
   const [errores, setErrores] = useState<Record<string, string>>({})
@@ -63,13 +72,16 @@ export function PublicarResiduo() {
   const [exito, setExito] = useState<string | null>(null)
 
   const enEdicion = Boolean(idEdicion)
+  const original = idEdicion ? publicaciones.find((item) => item.id === idEdicion) : undefined
+  const esDeOtro = Boolean(original && original.usuarioId !== usuario?.id)
 
   // Carga los valores existentes cuando se entra en modo edición.
   useEffect(() => {
     if (!idEdicion) return
 
     const original = publicaciones.find((item) => item.id === idEdicion)
-    if (!original) return
+    // Solo el dueño puede editar: con otra cuenta no se carga nada.
+    if (!original || original.usuarioId !== usuario?.id) return
 
     setFormulario({
       titulo: original.titulo,
@@ -85,7 +97,7 @@ export function PublicarResiduo() {
       fechaDisponible: original.fechaDisponible,
     })
     setFotoIdActual(original.fotoId)
-  }, [idEdicion, publicaciones])
+  }, [idEdicion, publicaciones, usuario])
 
   const materiales = useMemo(
     () => CATEGORIAS.find((categoria) => categoria.id === formulario.categoriaId)?.materiales ?? [],
@@ -175,7 +187,7 @@ export function PublicarResiduo() {
 
   const enviar = async (evento: React.FormEvent) => {
     evento.preventDefault()
-    if (!usuario || !validar()) return
+    if (!usuario || esDeOtro || !validar()) return
 
     setEnviando(true)
 
@@ -212,32 +224,80 @@ export function PublicarResiduo() {
     }
   }
 
-  if (cargandoSesion) return null
-
   // Sin sesión no se puede publicar: se explica y se ofrece el acceso.
   if (!usuario) {
     return (
-      <div className="contenedor flex justify-center py-16">
-        <div className="max-w-md rounded-2xl border border-humo-200 bg-white p-8 text-center">
-          <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-marca-50 text-marca-600">
-            <Icono nombre="usuario" className="h-6 w-6" />
-          </span>
+      <Aviso
+        icono="usuario"
+        titulo="Necesitás una cuenta"
+        texto="Para publicar un residuo primero creá tu cuenta. Toma menos de un minuto y es gratis."
+      >
+        <Link to="/acceso?modo=registro" className={clasesBoton('primario', 'lg', true)}>
+          Crear cuenta
+        </Link>
+        <Link to="/acceso" className={clasesBoton('contorno', 'md', true)}>
+          Ya tengo cuenta
+        </Link>
+      </Aviso>
+    )
+  }
 
-          <h1 className="mt-5 text-2xl font-bold text-humo-800">Necesitás una cuenta</h1>
-          <p className="mt-2 text-humo-600">
-            Para publicar un residuo primero creá tu cuenta. Toma menos de un minuto y es gratis.
-          </p>
-
-          <div className="mt-6 flex flex-col gap-3">
-            <Link to="/acceso?modo=registro" className={clasesBoton('primario', 'lg', true)}>
-              Crear cuenta
-            </Link>
-            <Link to="/acceso" className={clasesBoton('contorno', 'md', true)}>
-              Ya tengo cuenta
-            </Link>
-          </div>
+  if (enEdicion) {
+    if (cargando) {
+      return (
+        <div className="contenedor py-12">
+          <div className="h-96 animate-pulse rounded-2xl bg-humo-100" />
         </div>
-      </div>
+      )
+    }
+
+    if (!original) {
+      return (
+        <Aviso
+          icono="alerta"
+          titulo="Publicación no encontrada"
+          texto="Puede haber sido eliminada. Revisá tus publicaciones en el panel."
+        >
+          <Link to="/panel" className={clasesBoton('primario', 'md', true)}>
+            Ir a mi panel
+          </Link>
+        </Aviso>
+      )
+    }
+
+    if (esDeOtro) {
+      return (
+        <Aviso
+          icono="alerta"
+          titulo="No podés editar esta publicación"
+          texto="Solo el negocio que la publicó puede modificarla."
+        >
+          <Link to={`/residuo/${original.id}`} className={clasesBoton('primario', 'md', true)}>
+            Ver la publicación
+          </Link>
+          <Link to="/panel" className={clasesBoton('contorno', 'md', true)}>
+            Ir a mi panel
+          </Link>
+        </Aviso>
+      )
+    }
+  }
+
+  // Las cuentas de recolector no publican; se explica cómo habilitarlo.
+  if (!enEdicion && !puedePublicar(usuario.tipo)) {
+    return (
+      <Aviso
+        icono="caja"
+        titulo="Tu cuenta es de recolector"
+        texto='Para publicar residuos, cambiá el tipo de usuario a "Ambos" en tu perfil. Vas a seguir teniendo tus guardados y contactos.'
+      >
+        <Link to="/perfil" className={clasesBoton('primario', 'md', true)}>
+          Ir a mi perfil
+        </Link>
+        <Link to="/explorar" className={clasesBoton('contorno', 'md', true)}>
+          Seguir buscando materiales
+        </Link>
+      </Aviso>
     )
   }
 
@@ -266,7 +326,7 @@ export function PublicarResiduo() {
               type="button"
               onClick={() => {
                 setExito(null)
-                setFormulario(INICIAL)
+                setFormulario(formularioNuevo())
                 setFotoPrevia(null)
                 setFotoIdActual(null)
               }}
@@ -627,6 +687,34 @@ export function PublicarResiduo() {
           </div>
         </aside>
       </form>
+    </div>
+  )
+}
+
+/** Tarjeta centrada para explicar por qué no se muestra el formulario. */
+function Aviso({
+  icono,
+  titulo,
+  texto,
+  children,
+}: {
+  icono: NombreIcono
+  titulo: string
+  texto: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="contenedor flex justify-center py-16">
+      <div className="max-w-md rounded-2xl border border-humo-200 bg-white p-8 text-center">
+        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-marca-50 text-marca-600">
+          <Icono nombre={icono} className="h-6 w-6" />
+        </span>
+
+        <h1 className="mt-5 text-2xl font-bold text-humo-800">{titulo}</h1>
+        <p className="mt-2 text-humo-600">{texto}</p>
+
+        <div className="mt-6 flex flex-col gap-3">{children}</div>
+      </div>
     </div>
   )
 }

@@ -89,10 +89,22 @@ function respuesta(objeto) {
   )
 }
 
+/**
+ * Evita que la hoja ejecute fórmulas escritas por los usuarios.
+ *
+ * Sheets interpreta como fórmula cualquier texto que empiece con = + - o @
+ * (por ejemplo "=IMPORTXML(...)" en una descripción). El apóstrofo inicial lo
+ * fuerza a texto: no se ve en la celda y getValues() lo devuelve sin él.
+ */
+function seguro(valor) {
+  if (typeof valor === 'string' && /^[=+\-@]/.test(valor)) return "'" + valor
+  return valor
+}
+
 function filaDesdeObjeto(objeto, columnas) {
   return columnas.map(function (columna) {
     var valor = objeto[columna]
-    return valor === undefined || valor === null ? '' : valor
+    return valor === undefined || valor === null ? '' : seguro(valor)
   })
 }
 
@@ -169,7 +181,7 @@ function eliminarPublicacion(datos) {
 
 function registrarContacto(datos) {
   var hojaContactos = obtenerHoja(HOJA_CONTACTOS, COLUMNAS_CONTACTOS)
-  hojaContactos.appendRow([datos.id, datos.fecha])
+  hojaContactos.appendRow([seguro(datos.id), seguro(datos.fecha)])
 
   // Mantiene sincronizado el contador de la publicación.
   var hoja = obtenerHoja(HOJA_PUBLICACIONES, COLUMNAS_PUBLICACIONES)
@@ -282,4 +294,9 @@ function normalizarTelefono(valor) {
   if (typeof valor === 'number') texto = valor.toFixed(0)
 
   return texto
+}
+
+/** Ejecutar desde el editor para ver en el registro la URL de la hoja. */
+function verEnlaceDeLaHoja() {
+  Logger.log(SpreadsheetApp.getActiveSpreadsheet().getUrl())
 }
