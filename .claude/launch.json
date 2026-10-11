@@ -13,6 +13,12 @@
       "runtimeExecutable": "C:\\Program Files\\nodejs\\node.exe",
       "runtimeArgs": ["node_modules/vite/bin/vite.js", "preview"],
       "port": 4173
+    },
+    {
+      "name": "hoja-local",
+      "runtimeExecutable": "C:\\Program Files\\nodejs\\node.exe",
+      "runtimeArgs": ["apps-script/pruebas/servidor.mjs", "apps-script/Codigo.gs", "8787"],
+      "port": 8787
     }
   ]
 }

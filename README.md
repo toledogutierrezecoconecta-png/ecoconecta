@@ -46,9 +46,8 @@ npm run dev
 La aplicación queda disponible en `http://localhost:5173`.
 
 > **Ojo:** en local la app usa la **misma hoja de Google que el sitio publicado**. Si te registrás
-> o publicás algo para probar, queda en la hoja real. Para probar sin tocarla, en la consola del
-> navegador ejecutá `localStorage.setItem('ecoconecta.sheetsUrl', 'https://sin-sincronizar.invalid/exec')`
-> y recargá; para volver a la normalidad, `localStorage.removeItem('ecoconecta.sheetsUrl')`.
+> o publicás algo para probar, queda en la hoja real. Para probar el script sin tocarla, usá las
+> pruebas automáticas (abajo) o el servidor local de la sección 6.
 
 Otros comandos:
 
@@ -67,13 +66,14 @@ npm run lint
 | Funcionalidad | Estado |
 | --- | --- |
 | Portada con acceso directo a "Tengo material" y "Busco material" | Completo |
-| Registro e inicio de sesión (simulados, con sesión persistente) | Completo |
+| Cuentas en la hoja: registro, inicio de sesión desde cualquier dispositivo y perfil | Completo |
+| Permisos verificados por el Apps Script (solo el dueño edita o elimina) | Completo |
 | Menú y panel según el tipo de usuario (oferente, recolector o ambos) | Completo |
 | Publicar un residuo, con foto opcional y valor estimado en vivo | Completo |
 | Explorar el marketplace con buscador y filtros por categoría, material, zona y precio | Completo |
 | Detalle con precio de referencia, valor estimado y contacto por WhatsApp o llamada | Completo |
 | Guardar publicaciones (♡) e historial de negocios contactados | Completo |
-| Panel del oferente: resumen, valor potencial, edición, pausa, cierre y eliminación | Completo |
+| Panel del oferente: resumen, valor potencial, quién consultó, edición, pausa, cierre y eliminación | Completo |
 | Panel del recolector: novedades en su zona, guardadas y contactos | Completo |
 | Página "Cómo definimos los precios" con metodología y tabla vigente | Completo |
 | Sincronización con Google Sheets, con reintentos sin conexión | Completo |
@@ -98,8 +98,11 @@ Al registrarse, cada usuario elige un tipo. Lo que ve depende de esa elección
 | Guardar publicaciones y ver a quién contactó | ✅ | ✅ | ✅ |
 
 - **Al contactar con sesión iniciada**, el mensaje de WhatsApp presenta al recolector con su
-  nombre y su empresa.
-- **Cada persona suma un solo contacto** por publicación, aunque abra la ventana varias veces.
+  nombre y su empresa, y el oferente ve en su panel quién lo consultó.
+- **Cada persona suma un solo contacto** por publicación, aunque abra la ventana varias veces
+  o desde distintos dispositivos.
+- **Las guardadas y el historial de contactos** se guardan en la hoja y se ven desde cualquier
+  dispositivo.
 - **El recolector puede elegir su zona de trabajo** en el perfil, y su panel le muestra primero
   lo que se publica ahí.
 - **Al cambiar el teléfono o la empresa en el perfil**, se actualizan también todas las
@@ -142,10 +145,35 @@ resultado al oferente mientras completa el formulario.
 
 ## 5. Google Sheets y sincronización
 
-Los usuarios y las publicaciones se guardan en una hoja de Google, a través de un Apps Script
-publicado como aplicación web. El código del script está en
-[`apps-script/Codigo.gs`](apps-script/Codigo.gs) y su URL en
+**La base de datos es una hoja de Google** (requisito del proyecto). Un Apps Script publicado como
+aplicación web hace de servidor: lee y escribe la hoja y decide quién puede hacer qué. El código
+del script está en [`apps-script/Codigo.gs`](apps-script/Codigo.gs) y su URL en
 [`src/services/config.ts`](src/services/config.ts).
+
+### Pestañas de la hoja
+
+| Pestaña | Qué guarda |
+| --- | --- |
+| **Usuarios** | Cuentas. La contraseña se guarda como hash SHA-256 con sal (columnas `hashClave` y `sal`), nunca en texto plano. |
+| **Publicaciones** | Las ofertas del marketplace. Es la única pestaña de lectura pública. |
+| **Contactos** | Cada consulta: qué publicación, cuándo y, si tenía cuenta, quién. |
+| **Sesiones** | Llaves de sesión activas; vencen a los 60 días. |
+| **Guardados** | Qué publicaciones guardó cada usuario. |
+
+Las pestañas y columnas que falten se crean solas. Las columnas nuevas se agregan al final, así
+que las filas existentes no se tocan.
+
+### Cuentas y permisos
+
+- **Al registrarse o ingresar**, el script entrega una llave de sesión. Toda modificación viaja
+  con esa llave y el script la verifica.
+- **Solo el dueño puede editar o eliminar** una publicación. El dueño, el nombre, la empresa, el
+  teléfono y el contador de contactos los fija el script a partir de la cuenta, no lo que envía
+  la web.
+- **Cuentas de la versión anterior.** Antes las cuentas vivían solo en el navegador. La primera
+  vez que su dueño ingresa desde ese navegador, la cuenta se pasa a la hoja con la misma
+  contraseña y conserva sus publicaciones.
+- **Si la llave vence o es inválida**, la web cierra la sesión y pide volver a ingresar.
 
 ### Cómo se combinan la hoja y el navegador
 
@@ -161,9 +189,7 @@ publicado como aplicación web. El código del script está en
 
 ### Qué NO se envía a la hoja
 
-- **Las contraseñas.** Nunca salen del navegador y se guardan como hash SHA-256.
 - **Las fotos.** Quedan en el dispositivo que publicó, para no llenar la planilla.
-- **Las publicaciones guardadas y el historial de contactos.** Quedan en el navegador.
 
 ### Protección de la hoja
 
@@ -219,6 +245,27 @@ npm run sheets:publicar
 > Nunca crees una implementación nueva desde el editor de Apps Script: cambiaría la URL `/exec`
 > y el sitio dejaría de conectarse con la hoja.
 
+### Probar el Apps Script sin tocar la hoja real
+
+[`apps-script/pruebas/`](apps-script/pruebas/) ejecuta el `Codigo.gs` real en Node sobre una
+imitación de Google Sheets, que reproduce sus conversiones automáticas (teléfonos que se vuelven
+números, fechas, el apóstrofo inicial). Cubre registro, inicio de sesión, cuentas de la versión
+anterior, permisos, fórmulas, contactos, guardados, perfil y vencimiento de sesiones.
+
+```bash
+npm run sheets:probar
+```
+
+`sheets:subir` y `sheets:publicar` corren estas pruebas primero y no suben nada si alguna falla.
+
+Para usar la web contra la hoja simulada, levantá el servidor local (queda en
+`http://localhost:8787/exec`, con `/__estado` para ver el contenido de cada pestaña y
+`/__reiniciar` para volver al estado inicial):
+
+```bash
+npm run sheets:local
+```
+
 ---
 
 ## 7. Estructura del proyecto
@@ -248,19 +295,20 @@ src/
 ├── services/
 │   ├── actividad.ts       Guardadas y contactos realizados
 │   ├── almacenamiento.ts  localStorage con manejo de errores
-│   ├── auth.ts            Registro e inicio de sesión
+│   ├── auth.ts            Registro, inicio de sesión, perfil y cuentas de la versión anterior
 │   ├── config.ts          URL de Google Sheets y datos de contacto de EcoConecta
 │   ├── imagenes.ts        Compresión de fotos e IndexedDB
 │   ├── pendientes.ts      Cambios que la hoja todavía no confirmó
 │   ├── publicaciones.ts   Repositorio: única puerta de entrada a los datos
+│   ├── sesion.ts          Sesión del navegador y su llave
 │   └── sheets.ts          Cliente de Apps Script
 ├── types/             Modelos de dominio
 └── utils/             Formato de precios y fechas, enlaces de contacto, permisos por tipo
 ```
 
 **Regla de arquitectura:** ningún componente accede a `localStorage` ni a Google Sheets
-directamente. Todo pasa por los archivos de `services/`. Por eso migrar a Supabase, Firebase o
-una API REST implica reescribir solo esos archivos, sin tocar las pantallas.
+directamente. Todo pasa por los archivos de `services/`, así que cambiar la forma de guardar los
+datos implica tocar solo esos archivos, no las pantallas.
 
 Los datos de contacto y el nombre de la empresa se editan en un solo lugar:
 [`src/services/config.ts`](src/services/config.ts), constante `EMPRESA`.
@@ -269,17 +317,18 @@ Los datos de contacto y el nombre de la empresa se editan en un solo lugar:
 
 ## 8. Limitaciones conocidas
 
-- **Las cuentas existen solo en el navegador donde se crearon.** No se puede iniciar sesión desde
-  otro dispositivo, y si se borran los datos del navegador se pierde el acceso para gestionar las
-  publicaciones. La contraseña se guarda hasheada, pero no uses una contraseña real.
-- **La URL del Apps Script es pública.** Quien la conozca podría modificar o eliminar
-  publicaciones enviando pedidos directamente al script. Para operar a escala hace falta un
-  backend con autenticación.
-- **Las fotos, las guardadas y el historial de contactos no se comparten entre dispositivos.**
-- **El oferente no ve quién lo contactó**, solo cuántas personas.
+- **Las fotos no se comparten entre dispositivos.** Quedan en el equipo que publicó.
+- **No hay recuperación de contraseña.** Si alguien la olvida, hay que borrar a mano su fila de
+  la pestaña Usuarios para que pueda registrarse de nuevo (sus publicaciones quedan con el id
+  anterior).
+- **Cuentas de la versión anterior.** Solo se pueden activar desde el navegador donde se crearon.
+  Si ese navegador ya no tiene los datos, se resuelve igual que una contraseña olvidada.
+- **No hay límite de intentos de contraseña.** El hash es lento a propósito, pero el script no
+  bloquea a quien prueba muchas contraseñas seguidas.
+- **El script atiende un pedido de escritura a la vez** (LockService). Alcanza para un proyecto
+  de este tamaño; con muchos usuarios simultáneos las respuestas se harían lentas.
 - **Si una publicación se edita en dos dispositivos a la vez**, queda la última versión que llegó
   a la hoja.
-- **Los cambios de perfil no se envían a la hoja de usuarios**; sí se copian a las publicaciones.
 - **No hay pagos ni comisiones.** El acuerdo económico ocurre fuera de la plataforma.
 
 ---
@@ -288,9 +337,9 @@ Los datos de contacto y el nombre de la empresa se editan en un solo lugar:
 
 | Funcionalidad | Dónde se conecta |
 | --- | --- |
-| Cuentas reales y base de datos (Supabase, Firebase) | `services/auth.ts`, `services/publicaciones.ts` |
-| Fotos compartidas entre dispositivos | `services/imagenes.ts` |
-| Ver quién contactó y registrar las operaciones concretadas | Nuevos campos en `Publicacion` |
+| Fotos compartidas entre dispositivos (Google Drive) | `services/imagenes.ts` y el Apps Script |
+| Recuperar la contraseña por correo | Apps Script (`MailApp`) y `services/auth.ts` |
+| Registrar las operaciones concretadas (cantidad, precio, con quién) | Nuevos campos en `Publicacion` |
 | Publicar demanda ("busco cartón en el D-8") y alertas | Nueva entidad sobre el repositorio |
 | Calificaciones y verificación de empresas | Nuevos campos en `Usuario` |
 | Mapa y orden por cercanía | Campos `zona` y `direccion` en `types/index.ts` |

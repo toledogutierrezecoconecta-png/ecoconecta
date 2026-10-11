@@ -13,6 +13,8 @@ export function Perfil() {
   const navegar = useNavigate()
   /** null: sin guardar; número: guardado, con cuántas publicaciones se actualizaron. */
   const [guardado, setGuardado] = useState<number | null>(null)
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState('')
 
   const [formulario, setFormulario] = useState({
     empresa: usuario?.empresa ?? '',
@@ -27,11 +29,21 @@ export function Perfil() {
   const cambiar = (campo: keyof typeof formulario, valor: string) => {
     setFormulario((actual) => ({ ...actual, [campo]: valor }))
     setGuardado(null)
+    setError('')
   }
 
-  const guardar = (evento: React.FormEvent) => {
+  const guardar = async (evento: React.FormEvent) => {
     evento.preventDefault()
-    setGuardado(actualizarPerfil(formulario))
+    setGuardando(true)
+    setError('')
+
+    try {
+      setGuardado(await actualizarPerfil(formulario))
+    } catch (problema) {
+      setError(problema instanceof Error ? problema.message : 'No se pudieron guardar los cambios.')
+    } finally {
+      setGuardando(false)
+    }
   }
 
   return (
@@ -104,7 +116,8 @@ export function Perfil() {
             </p>
             <p className="mt-0.5 font-semibold text-humo-700">{usuario.correo}</p>
             <p className="mt-1 text-xs text-humo-500">
-              El correo no se puede modificar en esta versión.
+              Es tu usuario para ingresar desde cualquier dispositivo. No se puede modificar en
+              esta versión.
             </p>
           </div>
 
@@ -122,8 +135,18 @@ export function Perfil() {
             </p>
           )}
 
-          <Boton type="submit" tamano="lg" anchoCompleto>
-            Guardar cambios
+          {error && (
+            <p
+              className="flex items-start gap-2 rounded-xl bg-red-50 p-3 text-sm font-medium text-red-700"
+              role="alert"
+            >
+              <Icono nombre="alerta" className="mt-0.5 h-4 w-4 shrink-0" />
+              {error}
+            </p>
+          )}
+
+          <Boton type="submit" tamano="lg" anchoCompleto disabled={guardando}>
+            {guardando ? 'Guardando…' : 'Guardar cambios'}
           </Boton>
         </form>
 
@@ -138,8 +161,8 @@ export function Perfil() {
             anchoCompleto
             className="mt-4"
             onClick={() => {
-              cerrarSesion()
               navegar('/')
+              cerrarSesion()
             }}
           >
             <Icono nombre="salir" className="h-4 w-4" />

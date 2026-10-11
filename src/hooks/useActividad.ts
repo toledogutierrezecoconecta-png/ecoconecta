@@ -1,11 +1,18 @@
-import { useSyncExternalStore } from 'react'
+import { useEffect, useSyncExternalStore } from 'react'
 import * as actividad from '../services/actividad'
 import { useAuth } from './useAuth'
 
-/** Guardados y contactos realizados del usuario actual (o del visitante sin sesión). */
+/**
+ * Guardados y contactos realizados del usuario actual (o del visitante sin
+ * sesión). Con sesión, la primera vez que se usa en la visita los trae de la hoja.
+ */
 export function useActividad() {
   const { usuario } = useAuth()
   useSyncExternalStore(actividad.suscribir, actividad.versionActual)
+
+  useEffect(() => {
+    if (usuario) void actividad.sincronizarActividad(usuario.id)
+  }, [usuario])
 
   const visitante = usuario?.id ?? actividad.VISITANTE_ANONIMO
   const guardados = actividad.obtenerGuardados(visitante)

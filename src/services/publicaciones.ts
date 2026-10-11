@@ -1,6 +1,7 @@
 import { PUBLICACIONES_DEMO } from '../data/seed'
 import type {
   BorradorPublicacion,
+  ContactoRecibido,
   EstadoPublicacion,
   Publicacion,
   Usuario,
@@ -17,13 +18,16 @@ import {
   obtenerPendientes,
 } from './pendientes'
 import type { Pendiente } from './pendientes'
+import { obtenerToken } from './sesion'
 import {
   descargarPublicaciones,
+  llamar,
   sincronizarContacto,
   sincronizarEliminacion,
   sincronizarPublicacionEditada,
   sincronizarPublicacionNueva,
 } from './sheets'
+import type { ResultadoEnvio } from './sheets'
 
 /**
  * Repositorio de publicaciones.
@@ -63,24 +67,25 @@ function guardarLocales(publicaciones: Publicacion[]): void {
 const enCurso = new Set<string>()
 
 /**
- * Envía un cambio a la hoja y, si la hoja lo confirma, borra el pendiente.
- * Devuelve una promesa que se resuelve cuando termina, haya funcionado o no.
+ * Envía un cambio a la hoja. Si la hoja lo confirma, o lo rechaza porque no
+ * corresponde (por ejemplo, la publicación es de otra cuenta), el pendiente se
+ * borra y desde ahí manda la hoja. Si no hubo conexión, queda para reintentar.
  */
 async function enviarCambio(id: string, pendiente: Pendiente): Promise<void> {
   enCurso.add(id)
 
   try {
-    let confirmado: boolean
+    let resultado: ResultadoEnvio
 
     if (pendiente.operacion === 'eliminar') {
-      confirmado = await sincronizarEliminacion(id)
+      resultado = await sincronizarEliminacion(id)
     } else {
       const publicacion = cargarLocales().find((item) => item.id === id)
       // Si ya no existe localmente no hay nada que guardar.
-      confirmado = publicacion ? await sincronizarPublicacionEditada(publicacion) : true
+      resultado = publicacion ? await sincronizarPublicacionEditada(publicacion) : 'confirmado'
     }
 
-    if (confirmado) confirmarPendiente(id, pendiente.marca)
+    if (resultado !== 'reintentar') confirmarPendiente(id, pendiente.marca)
   } finally {
     enCurso.delete(id)
   }
@@ -94,8 +99,13 @@ function registrarCambio(id: string, operacion: Pendiente['operacion']): Promise
   return enviarCambio(id, { operacion, marca })
 }
 
-/** Reintenta en segundo plano los cambios que quedaron sin confirmar (por ejemplo, sin internet). */
+/**
+ * Reintenta en segundo plano los cambios que quedaron sin confirmar (por
+ * ejemplo, sin internet). Sin sesión no tiene sentido: la hoja exige la llave.
+ */
 function reintentarPendientes(): void {
+  if (!obtenerToken()) return
+
   for (const [id, pendiente] of Object.entries(obtenerPendientes())) {
     if (!enCurso.has(id)) void enviarCambio(id, pendiente)
   }
@@ -114,7 +124,7 @@ function migrarSiHaceFalta(locales: Publicacion[], remotas: Publicacion[]): void
   if (leerPendientes() !== null) return
 
   const cuentasLocales = new Set(
-    leer<UsuarioAlmacenado[]>(CLAVES.usuarios, []).map((usuario) => usuario.id),
+    leer<UsuarioAlmacenado[]>(CLAVES.usuariosLocales, []).map((usuario) => usuario.id),
   )
   const enLaHoja = new Set(remotas.map((publicacion) => publicacion.id))
   const registro: Record<string, Pendiente> = {}
@@ -248,8 +258,8 @@ export async function crearPublicacion(
   const marca = anotarPendiente(publicacion.id, 'guardar')
   enCurso.add(publicacion.id)
   const confirmacion = sincronizarPublicacionNueva(publicacion)
-    .then((confirmado) => {
-      if (confirmado) confirmarPendiente(publicacion.id, marca)
+    .then((resultado) => {
+      if (resultado !== 'reintentar') confirmarPendiente(publicacion.id, marca)
     })
     .finally(() => enCurso.delete(publicacion.id))
 
@@ -276,39 +286,25 @@ export async function actualizarPublicacion(
 }
 
 /**
- * Copia los datos de contacto del perfil a todas las publicaciones del
- * usuario. Sin esto, quien cambia de teléfono seguiría recibiendo consultas
- * en el número viejo. Devuelve cuántas publicaciones se actualizaron.
+ * Copia los datos de contacto del perfil a la copia local de las
+ * publicaciones del usuario. En la hoja ya lo hizo el script al guardar el
+ * perfil; esto es para que la pantalla lo muestre sin esperar a recargar.
  */
 export function actualizarDatosDeContacto(
   usuario: Pick<Usuario, 'id' | 'empresa' | 'contacto' | 'telefono'>,
-): number {
-  const publicaciones = cargarLocales()
-  const cambiadas: string[] = []
-
-  const actualizadas = publicaciones.map((publicacion) => {
-    if (publicacion.usuarioId !== usuario.id || publicacion.origen !== 'usuario') return publicacion
-
-    const igual =
-      publicacion.empresa === usuario.empresa &&
-      publicacion.contacto === usuario.contacto &&
-      String(publicacion.telefono) === usuario.telefono
-    if (igual) return publicacion
-
-    cambiadas.push(publicacion.id)
-    return {
-      ...publicacion,
-      empresa: usuario.empresa,
-      contacto: usuario.contacto,
-      telefono: usuario.telefono,
-    }
-  })
-
-  if (cambiadas.length === 0) return 0
-
-  guardarLocales(actualizadas)
-  for (const id of cambiadas) void registrarCambio(id, 'guardar')
-  return cambiadas.length
+): void {
+  guardarLocales(
+    cargarLocales().map((publicacion) =>
+      publicacion.usuarioId === usuario.id && publicacion.origen === 'usuario'
+        ? {
+            ...publicacion,
+            empresa: usuario.empresa,
+            contacto: usuario.contacto,
+            telefono: usuario.telefono,
+          }
+        : publicacion,
+    ),
+  )
 }
 
 export async function cambiarEstado(
@@ -330,7 +326,8 @@ export async function eliminarPublicacion(id: string): Promise<Resultado<void>> 
 
 /**
  * Suma un contacto recibido. Se espera a la hoja para que, al recargar, el
- * contador que devuelve ya incluya este contacto.
+ * contador que devuelve ya incluya este contacto. Con sesión, la hoja anota
+ * quién fue y no lo cuenta dos veces.
  */
 export async function registrarContacto(id: string): Promise<void> {
   const publicaciones = cargarLocales()
@@ -343,4 +340,11 @@ export async function registrarContacto(id: string): Promise<void> {
   }
   guardarLocales(publicaciones)
   await sincronizarContacto(id)
+}
+
+/** Quién consultó por las publicaciones del usuario. null si no hubo conexión. */
+export async function obtenerContactosRecibidos(): Promise<ContactoRecibido[] | null> {
+  const respuesta = await llamar('contactos_recibidos')
+  if (!respuesta?.ok || !Array.isArray(respuesta.contactos)) return null
+  return respuesta.contactos as ContactoRecibido[]
 }

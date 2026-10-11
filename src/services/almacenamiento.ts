@@ -13,8 +13,12 @@ export const CLAVES = {
   // de precios de referencia. Subir la versión descarta los datos del modelo
   // anterior en los navegadores que ya habían usado la plataforma.
   publicaciones: `${PREFIJO}publicaciones.v2`,
-  usuarios: `${PREFIJO}usuarios.v1`,
-  sesion: `${PREFIJO}sesion.v1`,
+  // Cuentas creadas antes de que vivieran en la hoja. Solo se leen para
+  // pasarlas a la hoja la primera vez que su dueño inicia sesión.
+  usuariosLocales: `${PREFIJO}usuarios.v1`,
+  // v2: la sesión guarda también la llave que entrega la hoja. Las sesiones
+  // v1 (sin llave) se descartan y piden volver a ingresar.
+  sesion: `${PREFIJO}sesion.v2`,
   guardados: `${PREFIJO}guardados.v1`,
   contactados: `${PREFIJO}contactados.v1`,
   pendientes: `${PREFIJO}pendientes.v1`,

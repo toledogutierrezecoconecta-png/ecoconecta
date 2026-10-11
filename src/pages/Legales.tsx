@@ -91,7 +91,7 @@ export function Terminos() {
           titulo: '5. Cuentas',
           parrafos: [
             'Cada usuario es responsable de mantener la confidencialidad de sus credenciales y de la actividad realizada desde su cuenta.',
-            'En esta versión de demostración la autenticación es simulada y los datos se guardan en el navegador del usuario.',
+            'La cuenta se identifica con un correo y una contraseña, y puede usarse desde cualquier dispositivo. Al ingresar se entrega una sesión que vence a los 60 días.',
           ],
         },
         {
@@ -124,13 +124,14 @@ export function Privacidad() {
             'Los datos se usan para mostrar las publicaciones en el marketplace y permitir que los interesados contacten al oferente.',
             'El nombre del negocio, el nombre de contacto, la zona y la dirección aproximada son visibles públicamente en cada publicación. El teléfono del oferente es visible para cualquier persona que abra la opción de contacto de una publicación, porque es el medio para coordinar el retiro.',
             'Si quien contacta tiene una cuenta, el mensaje de WhatsApp que propone la plataforma incluye su nombre y el de su empresa, para que el oferente sepa con quién habla. Ese mensaje se puede modificar antes de enviarlo.',
+            'Cuando una persona con cuenta abre la opción de contacto de una publicación, el oferente puede ver en su panel el nombre de esa persona, su empresa, su tipo de usuario y la fecha. De los visitantes sin cuenta solo se registra que hubo una consulta.',
           ],
         },
         {
           titulo: '3. Dónde se guardan',
           parrafos: [
-            'Las cuentas y las publicaciones se guardan en una hoja de cálculo de Google administrada por el equipo de EcoConecta SCZ, y una copia queda en el navegador del usuario. La contraseña nunca se envía a la hoja: se guarda solo en el navegador, convertida en un código del que no se puede recuperar la contraseña original.',
-            'Las publicaciones guardadas, el historial de negocios contactados y la zona de trabajo elegida se guardan únicamente en el navegador del usuario.',
+            'Las cuentas, las publicaciones, las publicaciones guardadas y los contactos se guardan en una hoja de cálculo de Google administrada por el equipo de EcoConecta SCZ. El navegador guarda una copia para mostrarla más rápido.',
+            'La contraseña viaja cifrada (HTTPS) y en la hoja se guarda convertida en un código del que no se puede recuperar la contraseña original. Nadie del equipo puede verla.',
             'Las fotografías se guardan únicamente en el dispositivo desde el que se realizó la publicación.',
           ],
         },
@@ -144,7 +145,7 @@ export function Privacidad() {
         {
           titulo: '5. Derechos del usuario',
           parrafos: [
-            'Cualquier usuario puede editar o eliminar sus publicaciones desde su panel, y solicitar la baja de su cuenta escribiendo al canal de contacto de la plataforma.',
+            'Cualquier usuario puede editar sus datos desde su perfil, editar o eliminar sus publicaciones desde su panel, y solicitar la baja de su cuenta escribiendo al canal de contacto de la plataforma.',
           ],
         },
       ]}

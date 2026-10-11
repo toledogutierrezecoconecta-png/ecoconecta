@@ -31,9 +31,24 @@ export interface Usuario {
   zonaInteres?: string
 }
 
-/** Lo que se guarda localmente: el usuario más el hash de su contraseña. */
+/** Datos del perfil que el usuario puede cambiar desde "Mi perfil". */
+export type PerfilEditable = Pick<Usuario, 'empresa' | 'contacto' | 'telefono' | 'tipo' | 'zonaInteres'>
+
+/**
+ * Cuenta de la versión anterior, que vivía solo en el navegador con el hash
+ * de su contraseña. Se lee únicamente para pasarla a la hoja.
+ */
 export interface UsuarioAlmacenado extends Usuario {
   hashClave: string
+}
+
+/** Quién consultó por una publicación propia (solo personas con cuenta). */
+export interface ContactoRecibido {
+  publicacionId: string
+  fecha: string
+  empresa: string
+  contacto: string
+  tipo: TipoUsuario | ''
 }
 
 export interface Publicacion {

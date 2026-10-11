@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { PanelRecolector } from '../components/panel/PanelRecolector'
 import { ImagenResiduo } from '../components/residuos/ImagenResiduo'
@@ -10,11 +10,13 @@ import { Modal } from '../components/ui/Modal'
 import { VIGENCIA_PRECIOS } from '../data/precios'
 import { useAuth } from '../hooks/useAuth'
 import { usePublicaciones } from '../hooks/usePublicaciones'
-import type { EstadoPublicacion, Publicacion, ValorEstimado } from '../types'
+import { obtenerContactosRecibidos } from '../services/publicaciones'
+import type { ContactoRecibido, EstadoPublicacion, Publicacion, ValorEstimado } from '../types'
 import {
   formatearCantidad,
   formatearPrecio,
   formatearTiempoRelativo,
+  formatearFechaHora,
   formatearValorEstimado,
   valorDePublicacion,
 } from '../utils/formato'
@@ -132,6 +134,7 @@ interface PropsOferente {
 function PanelOferente({ mias, pendientes, cambiarEstado, eliminar }: PropsOferente) {
   const [pestana, setPestana] = useState<Pestana>('todas')
   const [aEliminar, setAEliminar] = useState<Publicacion | null>(null)
+  const recibidos = useContactosRecibidos()
 
   const resumen = useMemo(() => {
     const disponibles = mias.filter((item) => item.estado === 'disponible')
@@ -310,6 +313,12 @@ function PanelOferente({ mias, pendientes, cambiarEstado, eliminar }: PropsOfere
                   </div>
                 </div>
 
+                <QuienContacto
+                  contactos={recibidos?.get(publicacion.id) ?? []}
+                  total={publicacion.contactos}
+                />
+
+
                 <div className="flex flex-wrap gap-2 border-t border-humo-100 bg-humo-50 px-4 py-3">
                   <Link
                     to={`/residuo/${publicacion.id}`}
@@ -400,5 +409,84 @@ function PanelOferente({ mias, pendientes, cambiarEstado, eliminar }: PropsOfere
         </div>
       </Modal>
     </>
+  )
+}
+
+/** Contactos recibidos agrupados por publicación. null mientras carga o si no hubo conexión. */
+function useContactosRecibidos(): Map<string, ContactoRecibido[]> | null {
+  const [porPublicacion, setPorPublicacion] = useState<Map<string, ContactoRecibido[]> | null>(null)
+
+  useEffect(() => {
+    let vigente = true
+
+    void obtenerContactosRecibidos().then((contactos) => {
+      if (!vigente || !contactos) return
+
+      const agrupados = new Map<string, ContactoRecibido[]>()
+      for (const contacto of contactos) {
+        agrupados.set(contacto.publicacionId, [...(agrupados.get(contacto.publicacionId) ?? []), contacto])
+      }
+      setPorPublicacion(agrupados)
+    })
+
+    return () => {
+      vigente = false
+    }
+  }, [])
+
+  return porPublicacion
+}
+
+const MAXIMO_VISIBLES = 3
+
+/**
+ * Quién consultó por la publicación. Las personas con cuenta aparecen con su
+ * empresa; los visitantes sin cuenta solo se cuentan.
+ */
+function QuienContacto({ contactos, total }: { contactos: ContactoRecibido[]; total: number }) {
+  const [verTodos, setVerTodos] = useState(false)
+  const sinCuenta = Math.max(0, total - contactos.length)
+
+  if (contactos.length === 0) return null
+
+  const visibles = verTodos ? contactos : contactos.slice(0, MAXIMO_VISIBLES)
+
+  return (
+    <div className="border-t border-humo-100 px-4 py-3">
+      <p className="text-xs font-semibold tracking-wide text-humo-500 uppercase">Te consultaron</p>
+
+      <ul className="mt-2 space-y-1.5">
+        {visibles.map((contacto) => (
+          <li
+            key={`${contacto.empresa}-${contacto.fecha}`}
+            className="flex flex-wrap items-baseline gap-x-2 text-sm"
+          >
+            <span className="font-semibold text-humo-800">{contacto.empresa}</span>
+            <span className="text-humo-600">{contacto.contacto}</span>
+            {contacto.tipo === 'recolector' && (
+              <span className="text-xs text-marca-700">Recolector</span>
+            )}
+            <span className="text-xs text-humo-500">· {formatearFechaHora(contacto.fecha)}</span>
+          </li>
+        ))}
+      </ul>
+
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 text-xs text-humo-500">
+        {contactos.length > MAXIMO_VISIBLES && (
+          <button
+            type="button"
+            onClick={() => setVerTodos((valor) => !valor)}
+            className="font-semibold text-marca-700 hover:underline"
+          >
+            {verTodos ? 'Ver menos' : `Ver los ${contactos.length}`}
+          </button>
+        )}
+        {sinCuenta > 0 && (
+          <span>
+            y {sinCuenta} {sinCuenta === 1 ? 'visitante' : 'visitantes'} sin cuenta
+          </span>
+        )}
+      </div>
+    </div>
   )
 }

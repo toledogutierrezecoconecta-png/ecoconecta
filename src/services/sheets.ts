@@ -1,9 +1,10 @@
-import type { Publicacion, Usuario } from '../types'
+import type { Publicacion } from '../types'
 import { valorDePublicacion } from '../utils/formato'
 import { haySheetsConfigurado, obtenerUrlSheets } from './config'
+import { marcarSesionVencida, obtenerToken } from './sesion'
 
 /**
- * Cliente de la Web App de Google Apps Script que escribe y lee la hoja de cálculo.
+ * Cliente del Apps Script que hace de servidor sobre la hoja de cálculo.
  *
  * Detalles importantes de implementación:
  *
@@ -11,11 +12,21 @@ import { haySheetsConfigurado, obtenerUrlSheets } from './config'
  *    Eso los convierte en "simple requests" y evita el preflight CORS, que es
  *    el motivo por el que fallan la mayoría de las integraciones con Apps Script.
  *
- * 2. Ninguna llamada bloquea la interfaz: si la hoja no está configurada o la red
- *    falla, la aplicación sigue funcionando con los datos locales.
+ * 2. Cada pedido viaja con la llave de sesión (token). El script la verifica y
+ *    decide si el usuario puede hacer lo que pide.
+ *
+ * 3. Si el script responde que la llave venció, se cierra la sesión local.
  */
 
-const TIEMPO_LIMITE_MS = 12000
+const TIEMPO_LIMITE_MS = 15000
+
+/** Respuesta del Apps Script. `codigo` explica el rechazo cuando ok es false. */
+export interface RespuestaHoja {
+  ok: boolean
+  codigo?: string
+  error?: string
+  [campo: string]: unknown
+}
 
 async function conLimiteDeTiempo(peticion: (senal: AbortSignal) => Promise<Response>) {
   const controlador = new AbortController()
@@ -28,37 +39,48 @@ async function conLimiteDeTiempo(peticion: (senal: AbortSignal) => Promise<Respo
 }
 
 /**
- * Devuelve true solo si la hoja confirmó el cambio. Un error del script
- * (respuesta con ok: false) cuenta como fallo, así el cambio queda pendiente
- * y se reintenta.
+ * Hace un pedido al script y devuelve su respuesta, o null si no hubo
+ * conexión (sin internet, tiempo agotado o la hoja no está configurada).
  */
-async function enviar(accion: string, datos: Record<string, unknown>): Promise<boolean> {
-  if (!haySheetsConfigurado()) return false
+export async function llamar(
+  accion: string,
+  datos: Record<string, unknown> = {},
+): Promise<RespuestaHoja | null> {
+  if (!haySheetsConfigurado()) return null
 
-  const cuerpo = new URLSearchParams({ accion, datos: JSON.stringify(datos) })
+  const cuerpo = new URLSearchParams({ accion, datos: JSON.stringify(datos), token: obtenerToken() })
 
   try {
     const respuesta = await conLimiteDeTiempo((senal) =>
       fetch(obtenerUrlSheets(), { method: 'POST', body: cuerpo, signal: senal }),
     )
-    if (!respuesta.ok) return false
+    if (!respuesta.ok) return null
 
-    const contenido = (await respuesta.json().catch(() => null)) as { ok?: boolean } | null
-    if (contenido?.ok === false) {
-      console.warn(`[EcoConecta SCZ] La hoja rechazó "${accion}".`, contenido)
-      return false
-    }
-    return true
+    const contenido = (await respuesta.json()) as RespuestaHoja
+    if (contenido.codigo === 'sesion_invalida') marcarSesionVencida()
+    if (!contenido.ok) console.warn(`[EcoConecta SCZ] La hoja rechazó "${accion}".`, contenido)
+    return contenido
   } catch (error) {
-    console.warn(`[EcoConecta SCZ] No se pudo sincronizar "${accion}" con Google Sheets.`, error)
-    return false
+    console.warn(`[EcoConecta SCZ] No se pudo conectar con la hoja ("${accion}").`, error)
+    return null
   }
 }
 
-/** Registra un usuario nuevo en la hoja. Nunca se envía la contraseña. */
-export function sincronizarUsuario(usuario: Usuario): Promise<boolean> {
-  const { id, empresa, contacto, telefono, correo, tipo, creadoEn } = usuario
-  return enviar('registrar_usuario', { id, empresa, contacto, telefono, correo, tipo, creadoEn })
+/**
+ * Resultado de un cambio:
+ *   - "confirmado": la hoja lo guardó.
+ *   - "reintentar": no hubo conexión o falta la sesión; queda pendiente.
+ *   - "rechazado": la hoja no lo acepta (por ejemplo, no es del usuario);
+ *     reintentarlo no sirve y manda la versión de la hoja.
+ */
+export type ResultadoEnvio = 'confirmado' | 'reintentar' | 'rechazado'
+
+async function enviar(accion: string, datos: Record<string, unknown>): Promise<ResultadoEnvio> {
+  const respuesta = await llamar(accion, datos)
+  if (!respuesta) return 'reintentar'
+  if (respuesta.ok) return 'confirmado'
+  if (respuesta.codigo === 'sesion_invalida' || respuesta.codigo === 'error_interno') return 'reintentar'
+  return 'rechazado'
 }
 
 /**
@@ -66,6 +88,7 @@ export function sincronizarUsuario(usuario: Usuario): Promise<boolean> {
  *
  * La foto no viaja (llenaría la planilla) y se agregan los valores estimados
  * ya calculados, que son los que sirven para analizar el mercado desde la hoja.
+ * El dueño, el contacto y el contador los fija el script, no la web.
  */
 function paraHoja(publicacion: Publicacion) {
   const { fotoId: _fotoId, ...resto } = publicacion
@@ -78,24 +101,24 @@ function paraHoja(publicacion: Publicacion) {
   }
 }
 
-export function sincronizarPublicacionNueva(publicacion: Publicacion): Promise<boolean> {
+export function sincronizarPublicacionNueva(publicacion: Publicacion): Promise<ResultadoEnvio> {
   return enviar('crear_publicacion', paraHoja(publicacion))
 }
 
-export function sincronizarPublicacionEditada(publicacion: Publicacion): Promise<boolean> {
+export function sincronizarPublicacionEditada(publicacion: Publicacion): Promise<ResultadoEnvio> {
   return enviar('actualizar_publicacion', paraHoja(publicacion))
 }
 
-export function sincronizarEliminacion(id: string): Promise<boolean> {
+export function sincronizarEliminacion(id: string): Promise<ResultadoEnvio> {
   return enviar('eliminar_publicacion', { id })
 }
 
-export function sincronizarContacto(id: string): Promise<boolean> {
-  return enviar('registrar_contacto', { id, fecha: new Date().toISOString() })
+export function sincronizarContacto(id: string): Promise<ResultadoEnvio> {
+  return enviar('registrar_contacto', { id })
 }
 
 /**
- * Trae las publicaciones que otros dispositivos guardaron en la hoja.
+ * Trae las publicaciones de la hoja (lectura pública, sin sesión).
  * Devuelve null si la hoja no está configurada o la consulta falla.
  */
 export async function descargarPublicaciones(): Promise<Publicacion[] | null> {

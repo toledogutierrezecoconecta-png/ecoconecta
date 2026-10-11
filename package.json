@@ -10,8 +10,10 @@
     "preview": "vite preview",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist",
-    "sheets:subir": "clasp push --force",
-    "sheets:publicar": "clasp push --force && clasp deploy -i AKfycbwDuKUJpD4F_DteoVrY5Iq4UIyDVoeYlgB3DY1eoZCh6ZgIzUDvxRpoYC6VCIJSQoy24Q -d \"Actualizacion desde el proyecto\""
+    "sheets:probar": "node apps-script/pruebas/pruebas.mjs apps-script/Codigo.gs",
+    "sheets:local": "node apps-script/pruebas/servidor.mjs apps-script/Codigo.gs 8787",
+    "sheets:subir": "npm run sheets:probar && clasp push --force",
+    "sheets:publicar": "npm run sheets:probar && clasp push --force && clasp deploy -i AKfycbwDuKUJpD4F_DteoVrY5Iq4UIyDVoeYlgB3DY1eoZCh6ZgIzUDvxRpoYC6VCIJSQoy24Q -d \"Actualizacion desde el proyecto\""
   },
   "dependencies": {
     "react": "^19.2.8",

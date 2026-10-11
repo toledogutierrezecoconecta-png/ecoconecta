@@ -5,6 +5,7 @@ import { CampoTexto } from '../components/ui/Campo'
 import { Icono } from '../components/ui/Icono'
 import { TIPOS_USUARIO } from '../data/catalogos'
 import { useAuth } from '../hooks/useAuth'
+import { consumirAvisoSesionVencida } from '../services/sesion'
 import type { TipoUsuario } from '../types'
 import simbolo from '../assets/marca/simbolo.webp'
 
@@ -33,6 +34,7 @@ export function Acceso() {
   const [tipo, setTipo] = useState<TipoUsuario>(volver ? 'recolector' : 'oferente')
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState(false)
+  const [sesionVencida] = useState(consumirAvisoSesionVencida)
 
   const destino = volver.startsWith('/') && !volver.startsWith('//') ? volver : '/panel'
 
@@ -77,6 +79,17 @@ export function Acceso() {
               : 'Accedé a tus publicaciones y a los contactos recibidos.'}
           </p>
         </div>
+
+        {sesionVencida && (
+          <p
+            className="mb-6 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
+            role="status"
+          >
+            <Icono nombre="reloj" className="mt-0.5 h-4 w-4 shrink-0" />
+            Tu sesión venció. Volvé a ingresar para seguir; los cambios que no se guardaron se
+            envían solos después de ingresar.
+          </p>
+        )}
 
         <div className="mb-6 grid grid-cols-2 gap-1 rounded-xl bg-humo-100 p-1">
           {(['ingreso', 'registro'] as Modo[]).map((opcion) => (
@@ -150,7 +163,7 @@ export function Acceso() {
             minLength={6}
             ayuda={
               modo === 'registro'
-                ? 'Versión de demostración: no uses una contraseña real.'
+                ? 'Con este correo y contraseña ingresás desde cualquier dispositivo. Usá una contraseña que no uses en otros sitios.'
                 : undefined
             }
             value={formulario.clave}

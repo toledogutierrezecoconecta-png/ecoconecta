@@ -67,9 +67,11 @@ export function Navbar() {
 
   const enlaces = usuario ? enlacesPrivados(usuario.tipo) : PUBLICOS
 
+  // Primero se sale de la página: si se cierra la sesión estando en una
+  // página privada, esa página redirige al ingreso antes de llegar al inicio.
   const salir = () => {
-    cerrarSesion()
     navegar('/')
+    cerrarSesion()
   }
 
   const clasesEnlace = ({ isActive }: { isActive: boolean }) =>

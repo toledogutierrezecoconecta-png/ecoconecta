@@ -1,16 +1,17 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import * as servicioAuth from '../services/auth'
 import * as repositorio from '../services/publicaciones'
-import type { CredencialesRegistro, Usuario } from '../types'
+import { alCambiarSesion } from '../services/sesion'
+import type { CredencialesRegistro, PerfilEditable, Usuario } from '../types'
 
 interface ContextoAuth {
   usuario: Usuario | null
   registrar: (credenciales: CredencialesRegistro) => Promise<Usuario>
   iniciarSesion: (correo: string, clave: string) => Promise<Usuario>
   cerrarSesion: () => void
-  /** Devuelve cuántas publicaciones recibieron los datos de contacto nuevos. */
-  actualizarPerfil: (cambios: Partial<Usuario>) => number
+  /** Guarda el perfil en la hoja. Devuelve cuántas publicaciones recibieron los datos nuevos. */
+  actualizarPerfil: (cambios: PerfilEditable) => Promise<number>
 }
 
 const Contexto = createContext<ContextoAuth | null>(null)
@@ -20,10 +21,13 @@ const Contexto = createContext<ContextoAuth | null>(null)
  *
  * La sesión se lee de localStorage al crear el estado, no en un efecto: así
  * ninguna pantalla se dibuja primero "sin usuario" (el perfil, por ejemplo,
- * armaba su formulario vacío al recargar la página).
+ * armaba su formulario vacío al recargar la página). Si la hoja avisa que la
+ * llave venció, la sesión se cierra en todas las pantallas.
  */
 export function ProveedorAuth({ children }: { children: ReactNode }) {
   const [usuario, setUsuario] = useState<Usuario | null>(() => servicioAuth.obtenerSesion())
+
+  useEffect(() => alCambiarSesion(() => setUsuario(servicioAuth.obtenerSesion())), [])
 
   const registrar = useCallback(async (credenciales: CredencialesRegistro) => {
     const nuevo = await servicioAuth.registrar(credenciales)
@@ -42,13 +46,14 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
     setUsuario(null)
   }, [])
 
-  const actualizarPerfil = useCallback((cambios: Partial<Usuario>) => {
-    const actualizado = servicioAuth.actualizarPerfil(cambios)
-    if (!actualizado) return 0
+  const actualizarPerfil = useCallback(async (cambios: PerfilEditable) => {
+    const { usuario: actualizado, publicacionesActualizadas } =
+      await servicioAuth.actualizarPerfil(cambios)
 
     setUsuario(actualizado)
-    // Las publicaciones guardan una copia del contacto: se actualiza también.
-    return repositorio.actualizarDatosDeContacto(actualizado)
+    // La hoja ya actualizó las publicaciones; se refleja también en la copia local.
+    repositorio.actualizarDatosDeContacto(actualizado)
+    return publicacionesActualizadas
   }, [])
 
   const valor = useMemo(
