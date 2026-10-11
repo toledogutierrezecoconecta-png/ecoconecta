@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import * as servicioAuth from '../services/auth'
+import * as repositorio from '../services/publicaciones'
 import type { CredencialesRegistro, Usuario } from '../types'
 
 interface ContextoAuth {
@@ -8,7 +9,8 @@ interface ContextoAuth {
   registrar: (credenciales: CredencialesRegistro) => Promise<Usuario>
   iniciarSesion: (correo: string, clave: string) => Promise<Usuario>
   cerrarSesion: () => void
-  actualizarPerfil: (cambios: Partial<Usuario>) => void
+  /** Devuelve cuántas publicaciones recibieron los datos de contacto nuevos. */
+  actualizarPerfil: (cambios: Partial<Usuario>) => number
 }
 
 const Contexto = createContext<ContextoAuth | null>(null)
@@ -42,7 +44,11 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
 
   const actualizarPerfil = useCallback((cambios: Partial<Usuario>) => {
     const actualizado = servicioAuth.actualizarPerfil(cambios)
-    if (actualizado) setUsuario(actualizado)
+    if (!actualizado) return 0
+
+    setUsuario(actualizado)
+    // Las publicaciones guardan una copia del contacto: se actualiza también.
+    return repositorio.actualizarDatosDeContacto(actualizado)
   }, [])
 
   const valor = useMemo(

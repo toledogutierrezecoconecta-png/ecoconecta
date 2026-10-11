@@ -105,7 +105,7 @@ export function ComoFunciona() {
           <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">Cómo funciona</h1>
           <p className="mt-4 text-lg text-marca-100/90">
             EcoConecta SCZ es un punto de encuentro entre quienes generan materiales aprovechables y
-            quienes los necesitan como insumo. Sin intermediarios y sin trámites.
+            quienes los necesitan como insumo. Gratis y sin trámites.
           </p>
         </div>
       </section>
@@ -181,8 +181,8 @@ export function ComoFunciona() {
             </p>
             <p>
               Nuestra función es actuar como intermediario: ayudamos a publicar los materiales,
-              encontrar posibles interesados, facilitar la comunicación y dar seguimiento a las
-              operaciones.
+              calcular cuánto valen, encontrar posibles interesados y facilitar la comunicación.
+              El acuerdo final queda siempre entre las partes.
             </p>
           </div>
 

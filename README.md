@@ -13,18 +13,21 @@ publica un **rango de referencia por material**, construido con las empresas rec
 ciudad. El negocio que genera el residuo normalmente no sabe cuánto vale, así que la plataforma se
 lo calcula y le muestra el valor estimado de su publicación.
 
+**Sitio publicado:** https://toledogutierrezecoconecta-png.github.io/ecoconecta/
+
 ---
 
 ## Contenido
 
 1. [Cómo ejecutar el proyecto](#1-cómo-ejecutar-el-proyecto)
-2. [Qué incluye el MVP](#2-qué-incluye-el-mvp)
-3. [Modelo de precios](#3-modelo-de-precios)
-4. [Conectar con Google Sheets](#4-conectar-con-google-sheets)
-5. [Publicar en GitHub Pages](#5-publicar-en-github-pages)
-6. [Estructura del proyecto](#6-estructura-del-proyecto)
-7. [Limitaciones conocidas](#7-limitaciones-conocidas)
-8. [Preparado para las próximas versiones](#8-preparado-para-las-próximas-versiones)
+2. [Qué incluye](#2-qué-incluye)
+3. [Oferentes y recolectores](#3-oferentes-y-recolectores)
+4. [Modelo de precios](#4-modelo-de-precios)
+5. [Google Sheets y sincronización](#5-google-sheets-y-sincronización)
+6. [Publicar cambios](#6-publicar-cambios)
+7. [Estructura del proyecto](#7-estructura-del-proyecto)
+8. [Limitaciones conocidas](#8-limitaciones-conocidas)
+9. [Próximas versiones](#9-próximas-versiones)
 
 ---
 
@@ -42,6 +45,11 @@ npm run dev
 
 La aplicación queda disponible en `http://localhost:5173`.
 
+> **Ojo:** en local la app usa la **misma hoja de Google que el sitio publicado**. Si te registrás
+> o publicás algo para probar, queda en la hoja real. Para probar sin tocarla, en la consola del
+> navegador ejecutá `localStorage.setItem('ecoconecta.sheetsUrl', 'https://sin-sincronizar.invalid/exec')`
+> y recargá; para volver a la normalidad, `localStorage.removeItem('ecoconecta.sheetsUrl')`.
+
 Otros comandos:
 
 ```bash
@@ -49,36 +57,57 @@ npm run build
 ```
 
 ```bash
-npm run preview
+npm run lint
 ```
 
 ---
 
-## 2. Qué incluye el MVP
-
-La plataforma es **navegable y funcional**, no una maqueta estática:
+## 2. Qué incluye
 
 | Funcionalidad | Estado |
 | --- | --- |
-| Landing con propuesta de valor, pasos, perfiles e indicadores | Completo |
+| Portada con acceso directo a "Tengo material" y "Busco material" | Completo |
 | Registro e inicio de sesión (simulados, con sesión persistente) | Completo |
-| Publicar un residuo, con foto opcional | Completo |
-| Explorar el marketplace con buscador y filtros | Completo |
-| Filtros por categoría, material, distrito, precio y disponibilidad | Completo |
-| Detalle de la publicación con precio de referencia y valor estimado | Completo |
+| Menú y panel según el tipo de usuario (oferente, recolector o ambos) | Completo |
+| Publicar un residuo, con foto opcional y valor estimado en vivo | Completo |
+| Explorar el marketplace con buscador y filtros por categoría, material, zona y precio | Completo |
+| Detalle con precio de referencia, valor estimado y contacto por WhatsApp o llamada | Completo |
+| Guardar publicaciones (♡) e historial de negocios contactados | Completo |
+| Panel del oferente: resumen, valor potencial, edición, pausa, cierre y eliminación | Completo |
+| Panel del recolector: novedades en su zona, guardadas y contactos | Completo |
 | Página "Cómo definimos los precios" con metodología y tabla vigente | Completo |
-| Contacto por WhatsApp, llamada o correo | Completo (WhatsApp real) |
-| Panel con resumen, edición, pausa, cierre y eliminación | Completo |
+| Sincronización con Google Sheets, con reintentos sin conexión | Completo |
+| Vista previa al compartir el enlace (WhatsApp, Facebook, LinkedIn) | Completo |
 | Diseño responsive pensado para Android | Completo |
-| Sincronización con Google Sheets | Listo, falta pegar la URL |
 
-Al abrir la plataforma por primera vez se cargan **10 publicaciones de demostración** para que el
-marketplace tenga contenido desde el primer acceso. Desde el panel se pueden restaurar en
-cualquier momento con el botón **Restablecer datos de ejemplo**, útil antes de una presentación.
+El marketplace incluye **10 publicaciones de ejemplo** (9 disponibles y 1 concretada) para que tenga contenido. Se muestran con
+la etiqueta "Publicación de ejemplo", después de las reales y **sin opción de contacto**: sus
+teléfonos son inventados y podrían pertenecer a personas reales.
 
 ---
 
-## 3. Modelo de precios
+## 3. Oferentes y recolectores
+
+Al registrarse, cada usuario elige un tipo. Lo que ve depende de esa elección
+(ver [`src/utils/roles.ts`](src/utils/roles.ts)):
+
+| | Oferente | Recolector | Ambos |
+| --- | --- | --- | --- |
+| Publicar residuos | ✅ | — | ✅ |
+| Panel | Mis publicaciones | Guardadas, contactos y novedades | Las dos vistas, con pestañas |
+| Guardar publicaciones y ver a quién contactó | ✅ | ✅ | ✅ |
+
+- **Al contactar con sesión iniciada**, el mensaje de WhatsApp presenta al recolector con su
+  nombre y su empresa.
+- **Cada persona suma un solo contacto** por publicación, aunque abra la ventana varias veces.
+- **El recolector puede elegir su zona de trabajo** en el perfil, y su panel le muestra primero
+  lo que se publica ahí.
+- **Al cambiar el teléfono o la empresa en el perfil**, se actualizan también todas las
+  publicaciones de esa cuenta.
+
+---
+
+## 4. Modelo de precios
 
 El precio de cada material vive en [`src/data/precios.ts`](src/data/precios.ts), no en las
 publicaciones. Para actualizarlo después del estudio de mercado, se edita ese archivo:
@@ -104,169 +133,168 @@ oferente, y las partes cerrarían el trato fuera de la plataforma.
 frutas) se publican siempre como donación, y el formulario ni siquiera ofrece la opción de cobrar.
 
 **Valor estimado:** la plataforma multiplica la cantidad publicada por el rango y muestra el
-resultado al oferente mientras completa el formulario. Es el número que convierte "tengo un
-residuo" en "tengo Bs. 144 a 200".
+resultado al oferente mientras completa el formulario.
 
-> ⚠️ Los valores cargados hoy son de **demostración**. Reemplazalos por los resultados del estudio
-> de mercado real antes de operar.
+> ⚠️ Los valores cargados hoy son de **demostración** y la página de precios lo indica.
+> Reemplazalos por los resultados del estudio de mercado real.
 
 ---
 
-## 4. Conectar con Google Sheets
+## 5. Google Sheets y sincronización
 
-Mientras no se configure, la aplicación funciona guardando todo en el navegador. Al conectar la
-hoja, los registros y las publicaciones se comparten entre todos los dispositivos.
+Los usuarios y las publicaciones se guardan en una hoja de Google, a través de un Apps Script
+publicado como aplicación web. El código del script está en
+[`apps-script/Codigo.gs`](apps-script/Codigo.gs) y su URL en
+[`src/services/config.ts`](src/services/config.ts).
 
-### Paso 1 — Crear la hoja
+### Cómo se combinan la hoja y el navegador
 
-Entrá a [sheets.new](https://sheets.new) y ponele un nombre, por ejemplo `EcoConecta SCZ — Base de datos`.
-No hace falta crear pestañas ni encabezados: el script los genera solo.
-
-### Paso 2 — Pegar el script
-
-1. En la hoja, menú **Extensiones → Apps Script**.
-2. Borrá todo lo que haya en el editor.
-3. Copiá el contenido completo de [`apps-script/Codigo.gs`](apps-script/Codigo.gs) y pegalo ahí.
-4. Guardá con el icono del disquete.
-
-### Paso 3 — Implementar como aplicación web
-
-1. Botón **Implementar → Nueva implementación**.
-2. En el engranaje de tipo, elegí **Aplicación web**.
-3. Configurá:
-   - **Ejecutar como:** Yo (tu cuenta)
-   - **Quién tiene acceso:** Cualquier usuario
-4. Presioná **Implementar** y autorizá los permisos que pida Google.
-5. Copiá la **URL de la aplicación web**; termina en `/exec`.
-
-### Paso 4 — Pegar la URL en el proyecto
-
-Abrí [`src/services/config.ts`](src/services/config.ts) y pegá la URL:
-
-```ts
-export const URL_APPS_SCRIPT = 'https://script.google.com/macros/s/AKfycb.../exec'
-```
-
-Listo. A partir de ese momento:
-
-- Cada registro de usuario se agrega a la hoja **Usuarios**.
-- Cada publicación se agrega, edita o elimina en la hoja **Publicaciones**.
-- Cada contacto queda registrado en la hoja **Contactos**.
-- Al abrir el marketplace se leen las publicaciones de la hoja, así que todos ven lo mismo.
-
-> **Para probar sin recompilar:** en la consola del navegador podés ejecutar
-> `localStorage.setItem('ecoconecta.sheetsUrl', 'https://...../exec')` y esa URL toma prioridad.
+- **La hoja es la fuente de verdad.** Si responde, se usa su versión de cada publicación, y lo que
+  ya no está en ella desaparece del navegador. Así, lo que un oferente cambia desde su celular lo
+  ven todos los demás al recargar.
+- **Los cambios hechos en el navegador quedan pendientes** hasta que la hoja los confirma
+  ([`src/services/pendientes.ts`](src/services/pendientes.ts)). Mientras tanto, la versión local
+  manda: lo eliminado no reaparece y lo recién creado no desaparece.
+- **Sin conexión, los pendientes se reintentan solos** la próxima vez que se carga el marketplace.
+  El panel del oferente muestra un aviso mientras haya cambios sin confirmar.
+- **Si la hoja no responde**, se muestra lo guardado en el navegador.
 
 ### Qué NO se envía a la hoja
 
 - **Las contraseñas.** Nunca salen del navegador y se guardan como hash SHA-256.
 - **Las fotos.** Quedan en el dispositivo que publicó, para no llenar la planilla.
+- **Las publicaciones guardadas y el historial de contactos.** Quedan en el navegador.
+
+### Protección de la hoja
+
+El script guarda como texto cualquier valor que empiece con `=`, `+`, `-` o `@`, para que nadie
+pueda ejecutar fórmulas en la planilla escribiéndolas en una publicación.
+
+### Decisiones técnicas
+
+- **Envíos sin preflight CORS.** Las llamadas a Apps Script usan `URLSearchParams`, lo que las
+  convierte en *simple requests*. Es el motivo por el que fallan la mayoría de las integraciones
+  con Apps Script hechas con JSON.
+- **La hoja normaliza los tipos.** Google Sheets convierte fechas y teléfonos; el script los
+  devuelve siempre como texto.
 
 ---
 
-## 5. Publicar en GitHub Pages
+## 6. Publicar cambios
 
-El proyecto ya está configurado para esto: `base: './'` en `vite.config.ts` y `HashRouter` en el
-enrutado, así que las URLs internas funcionan al recargar sin necesidad de configurar un `404.html`.
+El sitio se publica en **GitHub Pages** desde la rama `gh-pages`. El enrutado usa `HashRouter` y
+`base: './'`, así que funciona en cualquier subcarpeta sin configurar un `404.html`.
 
-```bash
-npm install --save-dev gh-pages
-```
-
-Agregá estas dos líneas a los `scripts` de `package.json`:
-
-```json
-"predeploy": "npm run build",
-"deploy": "gh-pages -d dist"
-```
-
-Después, con el repositorio ya subido a GitHub:
+Publicar el sitio:
 
 ```bash
 npm run deploy
 ```
 
-En GitHub: **Settings → Pages → Source: Deploy from a branch → `gh-pages` / root**.
-El sitio queda publicado en `https://<tu-usuario>.github.io/<nombre-del-repositorio>/`.
+GitHub tarda uno o dos minutos en mostrar la versión nueva.
+
+### Actualizar el Apps Script
+
+El proyecto usa [clasp](https://github.com/google/clasp) para subir el script sin copiar y pegar.
+La conexión está en [`.clasp.json`](.clasp.json). La primera vez hay que iniciar sesión con la
+cuenta de Google dueña de la hoja (y tener activada la API de Apps Script en
+https://script.google.com/home/usersettings):
+
+```bash
+clasp login
+```
+
+Subir el script **sin afectar el sitio** (para probar en el editor de Apps Script):
+
+```bash
+npm run sheets:subir
+```
+
+Publicarlo **en vivo**, como versión nueva de la misma implementación (la URL `/exec` no cambia):
+
+```bash
+npm run sheets:publicar
+```
+
+> Nunca crees una implementación nueva desde el editor de Apps Script: cambiaría la URL `/exec`
+> y el sitio dejaría de conectarse con la hoja.
 
 ---
 
-## 6. Estructura del proyecto
+## 7. Estructura del proyecto
 
 ```
+apps-script/           Código del Apps Script y su manifiesto (se suben con clasp)
+public/                Favicon e imagen para compartir (compartir.jpg)
 src/
+├── assets/            Logo, ilustraciones de portada y fotos de materiales (WebP)
 ├── components/
-│   ├── layout/        Navbar y footer
-│   ├── residuos/      Tarjeta e imagen de publicación
+│   ├── layout/        Menú y pie de página
+│   ├── panel/         Panel del recolector
+│   ├── portada/       Botones superpuestos a la ilustración de portada
+│   ├── residuos/      Tarjeta, imagen y botón de guardar de una publicación
 │   └── ui/            Botón, campos, etiquetas, modal, iconos
 ├── data/
 │   ├── catalogos.ts   Categorías, materiales, zonas, unidades, frecuencias
+│   ├── imagenes.ts    Fotos de materiales y de portada
 │   ├── precios.ts     Tabla de precios de referencia por material
-│   └── seed.ts        Publicaciones de demostración
+│   └── seed.ts        Publicaciones de ejemplo
 ├── hooks/
-│   ├── useAuth.tsx        Sesión del usuario
-│   └── usePublicaciones.ts Estado del marketplace
+│   ├── useActividad.ts      Guardadas y contactos del usuario
+│   ├── useAuth.tsx          Sesión del usuario
+│   ├── useMediaQuery.ts     Elige la portada de escritorio o de celular
+│   └── usePublicaciones.ts  Estado del marketplace
 ├── pages/             Una por pantalla de la aplicación
 ├── services/
+│   ├── actividad.ts       Guardadas y contactos realizados
 │   ├── almacenamiento.ts  localStorage con manejo de errores
 │   ├── auth.ts            Registro e inicio de sesión
-│   ├── config.ts          URL de Google Sheets
+│   ├── config.ts          URL de Google Sheets y datos de contacto de EcoConecta
 │   ├── imagenes.ts        Compresión de fotos e IndexedDB
+│   ├── pendientes.ts      Cambios que la hoja todavía no confirmó
 │   ├── publicaciones.ts   Repositorio: única puerta de entrada a los datos
 │   └── sheets.ts          Cliente de Apps Script
 ├── types/             Modelos de dominio
-└── utils/             Formato de precios, fechas y enlaces de contacto
+└── utils/             Formato de precios y fechas, enlaces de contacto, permisos por tipo
 ```
 
 **Regla de arquitectura:** ningún componente accede a `localStorage` ni a Google Sheets
-directamente. Todo pasa por `services/publicaciones.ts` y `services/auth.ts`. Por eso migrar a
-Supabase, Firebase o una API REST implica reescribir solo esos archivos, sin tocar las pantallas.
+directamente. Todo pasa por los archivos de `services/`. Por eso migrar a Supabase, Firebase o
+una API REST implica reescribir solo esos archivos, sin tocar las pantallas.
 
-### Decisiones técnicas que conviene conocer
-
-- **Fotos comprimidas en IndexedDB.** Una foto de celular en base64 pesa entre 3 y 8 MB y la cuota
-  de `localStorage` ronda los 5 MB. Las imágenes se redimensionan a 900 px y se guardan aparte.
-- **Envíos sin preflight CORS.** Las llamadas a Apps Script usan `URLSearchParams`, lo que las
-  convierte en *simple requests*. Es el motivo por el que fallan la mayoría de las integraciones
-  con Apps Script hechas con JSON.
-- **Ilustraciones propias en vez de fotos de stock.** Cada material tiene una ilustración SVG con
-  gradiente propio: funcionan sin conexión, nunca aparece una imagen rota en una demo y el catálogo
-  se ve uniforme. Si el oferente sube una foto real, esa tiene prioridad.
-- **WhatsApp real, no simulado.** El botón arma un enlace `wa.me` con el mensaje ya escrito. No
-  necesita API ni tiene costo.
+Los datos de contacto y el nombre de la empresa se editan en un solo lugar:
+[`src/services/config.ts`](src/services/config.ts), constante `EMPRESA`.
 
 ---
 
-## 7. Limitaciones conocidas
+## 8. Limitaciones conocidas
 
-Son propias de un MVP y conviene tenerlas presentes antes de mostrar la plataforma:
-
-- **La autenticación es simulada.** No reemplaza a un sistema real: las cuentas viven en el
-  navegador. La contraseña se guarda hasheada y no se envía a ningún lado, pero no uses una
-  contraseña real.
-- **Sin Google Sheets conectado, cada navegador ve solo sus propios datos.** Las publicaciones de
-  demostración sí aparecen en todos los dispositivos porque están en el código.
-- **Las fotos no se comparten entre dispositivos.** Quedan en el equipo que publicó.
-- **La hoja de cálculo es accesible para quien tenga el enlace del script.** Para una demo con
-  datos ficticios es aceptable; para operar en serio hace falta un backend con autenticación.
+- **Las cuentas existen solo en el navegador donde se crearon.** No se puede iniciar sesión desde
+  otro dispositivo, y si se borran los datos del navegador se pierde el acceso para gestionar las
+  publicaciones. La contraseña se guarda hasheada, pero no uses una contraseña real.
+- **La URL del Apps Script es pública.** Quien la conozca podría modificar o eliminar
+  publicaciones enviando pedidos directamente al script. Para operar a escala hace falta un
+  backend con autenticación.
+- **Las fotos, las guardadas y el historial de contactos no se comparten entre dispositivos.**
+- **El oferente no ve quién lo contactó**, solo cuántas personas.
+- **Si una publicación se edita en dos dispositivos a la vez**, queda la última versión que llegó
+  a la hoja.
+- **Los cambios de perfil no se envían a la hoja de usuarios**; sí se copian a las publicaciones.
 - **No hay pagos ni comisiones.** El acuerdo económico ocurre fuera de la plataforma.
 
 ---
 
-## 8. Preparado para las próximas versiones
-
-La arquitectura ya contempla, sin rehacer pantallas:
+## 9. Próximas versiones
 
 | Funcionalidad | Dónde se conecta |
 | --- | --- |
-| Autenticación real (Supabase Auth, Firebase) | `services/auth.ts` |
-| Base de datos (PostgreSQL, Supabase, Firestore) | `services/publicaciones.ts` |
-| Almacenamiento de imágenes en la nube | `services/imagenes.ts` |
-| Geolocalización y mapas | Campo `zona` y `direccion` en `types/index.ts` |
-| Chat entre usuarios y notificaciones | Nueva capa sobre el repositorio |
-| Reputación, calificaciones e historial | Nuevos campos en `Publicacion` y `Usuario` |
-| Verificación de empresas | Campo nuevo en `Usuario` |
-| Panel administrativo y estadísticas de impacto | Consulta agregada sobre el repositorio |
+| Cuentas reales y base de datos (Supabase, Firebase) | `services/auth.ts`, `services/publicaciones.ts` |
+| Fotos compartidas entre dispositivos | `services/imagenes.ts` |
+| Ver quién contactó y registrar las operaciones concretadas | Nuevos campos en `Publicacion` |
+| Publicar demanda ("busco cartón en el D-8") y alertas | Nueva entidad sobre el repositorio |
+| Calificaciones y verificación de empresas | Nuevos campos en `Usuario` |
+| Mapa y orden por cercanía | Campos `zona` y `direccion` en `types/index.ts` |
+| Indicadores reales de impacto en la portada | Consulta agregada sobre las operaciones concretadas |
 
 ---
 
@@ -274,6 +302,3 @@ La arquitectura ya contempla, sin rehacer pantallas:
 
 Santa Cruz de la Sierra, Bolivia
 WhatsApp: 78906939 · toledogutierrezecoconecta@gmail.com
-
-Los datos de contacto y el nombre de la empresa se editan en un solo lugar:
-[`src/services/config.ts`](src/services/config.ts), constante `EMPRESA`.

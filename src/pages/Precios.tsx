@@ -23,9 +23,9 @@ const METODOLOGIA: { icono: NombreIcono; titulo: string; detalle: string }[] = [
   },
   {
     icono: 'check',
-    titulo: 'Validación cruzada',
+    titulo: 'Validación con operaciones reales',
     detalle:
-      'Contrastamos el rango con operaciones ya concretadas en la plataforma para verificar que refleje lo que efectivamente se paga.',
+      'A medida que se concreten operaciones en la plataforma, vamos a contrastar el rango con lo que efectivamente se paga para ajustarlo.',
   },
   {
     icono: 'reloj',

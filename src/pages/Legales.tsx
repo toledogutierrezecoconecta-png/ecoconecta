@@ -61,7 +61,7 @@ export function Terminos() {
           titulo: '1. Qué es EcoConecta SCZ',
           parrafos: [
             'EcoConecta SCZ es una plataforma digital que conecta a empresas que generan materiales aprovechables con recicladores, centros de acopio, recolectores y compradores interesados en reutilizarlos.',
-            'Actuamos como intermediario: ayudamos a publicar los materiales, encontrar posibles interesados, facilitar la comunicación y dar seguimiento a las operaciones.',
+            'Actuamos como intermediario: ayudamos a publicar los materiales, estimar su valor de referencia, encontrar posibles interesados y facilitar la comunicación entre las partes.',
             'La plataforma no compra, no vende, no transporta ni almacena materiales, y no interviene en el pago entre las partes.',
           ],
         },
@@ -122,13 +122,15 @@ export function Privacidad() {
           titulo: '2. Para qué se usan',
           parrafos: [
             'Los datos se usan para mostrar las publicaciones en el marketplace y permitir que los interesados contacten al oferente.',
-            'El nombre del negocio, el nombre de contacto y la zona son visibles públicamente en cada publicación. El teléfono se utiliza para habilitar el contacto directo.',
+            'El nombre del negocio, el nombre de contacto, la zona y la dirección aproximada son visibles públicamente en cada publicación. El teléfono del oferente es visible para cualquier persona que abra la opción de contacto de una publicación, porque es el medio para coordinar el retiro.',
+            'Si quien contacta tiene una cuenta, el mensaje de WhatsApp que propone la plataforma incluye su nombre y el de su empresa, para que el oferente sepa con quién habla. Ese mensaje se puede modificar antes de enviarlo.',
           ],
         },
         {
           titulo: '3. Dónde se guardan',
           parrafos: [
-            'En esta versión de demostración la información se almacena en el navegador del usuario y, cuando la integración está activa, en una hoja de cálculo de Google administrada por el equipo de EcoConecta SCZ.',
+            'Las cuentas y las publicaciones se guardan en una hoja de cálculo de Google administrada por el equipo de EcoConecta SCZ, y una copia queda en el navegador del usuario. La contraseña nunca se envía a la hoja: se guarda solo en el navegador, convertida en un código del que no se puede recuperar la contraseña original.',
+            'Las publicaciones guardadas, el historial de negocios contactados y la zona de trabajo elegida se guardan únicamente en el navegador del usuario.',
             'Las fotografías se guardan únicamente en el dispositivo desde el que se realizó la publicación.',
           ],
         },
@@ -136,7 +138,7 @@ export function Privacidad() {
           titulo: '4. Con quién se comparten',
           parrafos: [
             'Los datos no se venden ni se ceden a terceros con fines publicitarios.',
-            'La información de contacto queda disponible para los usuarios de la plataforma que consulten por una publicación.',
+            'La información de contacto de las publicaciones queda disponible para cualquier persona que visite la plataforma.',
           ],
         },
         {

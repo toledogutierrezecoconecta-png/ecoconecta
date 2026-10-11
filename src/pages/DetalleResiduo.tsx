@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { BotonGuardar } from '../components/residuos/BotonGuardar'
 import { ImagenResiduo } from '../components/residuos/ImagenResiduo'
 import { Boton, clasesBoton } from '../components/ui/Boton'
@@ -25,6 +25,7 @@ import {
 export function DetalleResiduo() {
   const { id } = useParams<{ id: string }>()
   const navegar = useNavigate()
+  const ubicacion = useLocation()
   const { usuario } = useAuth()
   const { publicaciones, cargando, contactar } = usePublicaciones()
   const { anotarContacto } = useActividad()
@@ -95,11 +96,13 @@ export function DetalleResiduo() {
     <div className="contenedor py-6 md:py-10">
       <button
         type="button"
-        onClick={() => navegar(-1)}
+        // Si se entró directo (por un enlace de WhatsApp), "atrás" saldría del
+        // sitio: en ese caso se lleva al marketplace.
+        onClick={() => (ubicacion.key === 'default' ? navegar('/explorar') : navegar(-1))}
         className="mb-6 inline-flex items-center gap-1.5 text-sm font-semibold text-humo-600 transition-colors hover:text-marca-700"
       >
         <Icono nombre="flecha" className="h-4 w-4 rotate-180" />
-        Volver
+        {ubicacion.key === 'default' ? 'Ver más materiales' : 'Volver'}
       </button>
 
       <div className="grid gap-8 lg:grid-cols-[1.3fr_1fr] lg:items-start">

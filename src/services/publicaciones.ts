@@ -264,11 +264,51 @@ export async function actualizarPublicacion(
   const indice = publicaciones.findIndex((publicacion) => publicacion.id === id)
   if (indice === -1) return { valor: undefined, confirmacion: Promise.resolve() }
 
-  const actualizada = { ...publicaciones[indice], ...cambios }
+  const anterior = publicaciones[indice]
+  const actualizada = { ...anterior, ...cambios }
   publicaciones[indice] = actualizada
   guardarLocales(publicaciones)
 
+  // Si la foto se reemplazó o se quitó, la anterior ya no la usa nadie.
+  if (anterior.fotoId && anterior.fotoId !== actualizada.fotoId) void eliminarFoto(anterior.fotoId)
+
   return { valor: actualizada, confirmacion: registrarCambio(id, 'guardar') }
+}
+
+/**
+ * Copia los datos de contacto del perfil a todas las publicaciones del
+ * usuario. Sin esto, quien cambia de teléfono seguiría recibiendo consultas
+ * en el número viejo. Devuelve cuántas publicaciones se actualizaron.
+ */
+export function actualizarDatosDeContacto(
+  usuario: Pick<Usuario, 'id' | 'empresa' | 'contacto' | 'telefono'>,
+): number {
+  const publicaciones = cargarLocales()
+  const cambiadas: string[] = []
+
+  const actualizadas = publicaciones.map((publicacion) => {
+    if (publicacion.usuarioId !== usuario.id || publicacion.origen !== 'usuario') return publicacion
+
+    const igual =
+      publicacion.empresa === usuario.empresa &&
+      publicacion.contacto === usuario.contacto &&
+      String(publicacion.telefono) === usuario.telefono
+    if (igual) return publicacion
+
+    cambiadas.push(publicacion.id)
+    return {
+      ...publicacion,
+      empresa: usuario.empresa,
+      contacto: usuario.contacto,
+      telefono: usuario.telefono,
+    }
+  })
+
+  if (cambiadas.length === 0) return 0
+
+  guardarLocales(actualizadas)
+  for (const id of cambiadas) void registrarCambio(id, 'guardar')
+  return cambiadas.length
 }
 
 export async function cambiarEstado(

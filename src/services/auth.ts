@@ -103,11 +103,18 @@ export function actualizarPerfil(cambios: Partial<Usuario>): Usuario | null {
   const actual = obtenerSesion()
   if (!actual) return null
 
-  const actualizado = { ...actual, ...cambios }
+  const actualizado = {
+    ...actual,
+    ...cambios,
+    ...(cambios.empresa !== undefined && { empresa: cambios.empresa.trim() }),
+    ...(cambios.contacto !== undefined && { contacto: cambios.contacto.trim() }),
+    // Igual que al registrarse: el teléfono se guarda sin espacios.
+    ...(cambios.telefono !== undefined && { telefono: cambios.telefono.replace(/\s+/g, '') }),
+  }
   escribir(CLAVES.sesion, actualizado)
 
   const usuarios = cargarUsuarios().map((usuario) =>
-    usuario.id === actual.id ? { ...usuario, ...cambios } : usuario,
+    usuario.id === actual.id ? { ...usuario, ...actualizado } : usuario,
   )
   escribir(CLAVES.usuarios, usuarios)
 

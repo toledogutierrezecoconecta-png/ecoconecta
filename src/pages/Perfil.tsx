@@ -11,7 +11,8 @@ import { buscaMateriales } from '../utils/roles'
 export function Perfil() {
   const { usuario, actualizarPerfil, cerrarSesion } = useAuth()
   const navegar = useNavigate()
-  const [guardado, setGuardado] = useState(false)
+  /** null: sin guardar; número: guardado, con cuántas publicaciones se actualizaron. */
+  const [guardado, setGuardado] = useState<number | null>(null)
 
   const [formulario, setFormulario] = useState({
     empresa: usuario?.empresa ?? '',
@@ -25,13 +26,12 @@ export function Perfil() {
 
   const cambiar = (campo: keyof typeof formulario, valor: string) => {
     setFormulario((actual) => ({ ...actual, [campo]: valor }))
-    setGuardado(false)
+    setGuardado(null)
   }
 
   const guardar = (evento: React.FormEvent) => {
     evento.preventDefault()
-    actualizarPerfil(formulario)
-    setGuardado(true)
+    setGuardado(actualizarPerfil(formulario))
   }
 
   return (
@@ -108,10 +108,17 @@ export function Perfil() {
             </p>
           </div>
 
-          {guardado && (
-            <p className="flex items-center gap-2 rounded-xl bg-marca-50 p-3 text-sm font-semibold text-marca-700">
-              <Icono nombre="check" className="h-4 w-4" />
-              Cambios guardados correctamente.
+          {guardado !== null && (
+            <p
+              className="flex items-start gap-2 rounded-xl bg-marca-50 p-3 text-sm font-semibold text-marca-700"
+              role="status"
+            >
+              <Icono nombre="check" className="mt-0.5 h-4 w-4 shrink-0" />
+              {guardado === 0
+                ? 'Cambios guardados correctamente.'
+                : guardado === 1
+                  ? 'Cambios guardados. También se actualizó tu publicación con los datos nuevos.'
+                  : `Cambios guardados. También se actualizaron tus ${guardado} publicaciones con los datos nuevos.`}
             </p>
           )}
 

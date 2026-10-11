@@ -7,7 +7,9 @@ import type { Publicacion } from '../types'
  * tenga contenido desde el primer acceso. Son datos ficticios: los nombres de
  * empresa y los teléfonos no corresponden a negocios reales.
  *
- * Al conectar un backend real, este archivo deja de usarse (ver services/storage).
+ * Se muestran con la etiqueta "Publicación de ejemplo", después de las reales
+ * y sin opción de contacto: los teléfonos son inventados y podrían ser de
+ * personas reales. Nunca se envían a la hoja de cálculo.
  */
 
 const HOY = new Date()
@@ -248,14 +250,3 @@ export const PUBLICACIONES_DEMO: Publicacion[] = BASE.map((item) => ({
   contactos: item.contactos ?? 0,
   origen: 'demo' as const,
 }))
-
-/** Indicadores de impacto mostrados en la landing. Son valores de demostración. */
-export const INDICADORES_DEMO = {
-  publicaciones: 120,
-  negocios: 80,
-  recolectores: 45,
-  toneladas: 10,
-  kilosValorizados: 10400,
-  litrosAceite: 1850,
-  concretadas: 64,
-}
