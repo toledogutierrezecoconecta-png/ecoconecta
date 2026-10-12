@@ -159,6 +159,7 @@ del script está en [`apps-script/Codigo.gs`](apps-script/Codigo.gs) y su URL en
 | **Contactos** | Cada consulta: qué publicación, cuándo y, si tenía cuenta, quién. |
 | **Sesiones** | Llaves de sesión activas; vencen a los 60 días. |
 | **Guardados** | Qué publicaciones guardó cada usuario. |
+| **Recuperaciones** | Códigos para restablecer la contraseña (guardados como hash), con vencimiento e intentos. |
 
 Las pestañas y columnas que falten se crean solas. Las columnas nuevas se agregan al final, así
 que las filas existentes no se tocan.
@@ -174,6 +175,24 @@ que las filas existentes no se tocan.
   vez que su dueño ingresa desde ese navegador, la cuenta se pasa a la hoja con la misma
   contraseña y conserva sus publicaciones.
 - **Si la llave vence o es inválida**, la web cierra la sesión y pide volver a ingresar.
+
+### Recuperar la contraseña
+
+En "Ingresar" está **¿Olvidaste tu contraseña?**. El script envía un código de 6 dígitos al correo
+de la cuenta con `MailApp`, desde la cuenta de Google dueña del script, y con ese código se elige
+una contraseña nueva.
+
+- El código vence a los **15 minutos**, sirve **una sola vez** y se bloquea después de **5
+  intentos** fallidos. Se pueden pedir como máximo **3 códigos por hora** por correo.
+- La respuesta es la misma exista o no la cuenta, para no revelar qué correos están registrados.
+- Al cambiar la contraseña se cierran todas las sesiones abiertas de esa cuenta.
+- Sirve también para **activar cuentas de la versión anterior** desde cualquier dispositivo.
+- Gmail permite unos **100 correos por día** desde Apps Script.
+
+> **Permiso de correo:** enviar correos requiere autorizar a Apps Script una vez. Antes de
+> publicar una versión que use un permiso nuevo, subí el código con `npm run sheets:subir`, abrí
+> el editor de Apps Script, elegí la función `autorizarCorreo` y tocá **Ejecutar**. Si se publica
+> sin autorizar, la aplicación web deja de responder hasta que el dueño lo haga.
 
 ### Cómo se combinan la hoja y el navegador
 
@@ -249,8 +268,9 @@ npm run sheets:publicar
 
 [`apps-script/pruebas/`](apps-script/pruebas/) ejecuta el `Codigo.gs` real en Node sobre una
 imitación de Google Sheets, que reproduce sus conversiones automáticas (teléfonos que se vuelven
-números, fechas, el apóstrofo inicial). Cubre registro, inicio de sesión, cuentas de la versión
-anterior, permisos, fórmulas, contactos, guardados, perfil y vencimiento de sesiones.
+números, fechas, el apóstrofo inicial) y guarda los correos en una lista en vez de enviarlos.
+Cubre registro, inicio de sesión, cuentas de la versión anterior, permisos, fórmulas, contactos,
+guardados, perfil, vencimiento de sesiones y recuperación de contraseña.
 
 ```bash
 npm run sheets:probar
@@ -259,8 +279,8 @@ npm run sheets:probar
 `sheets:subir` y `sheets:publicar` corren estas pruebas primero y no suben nada si alguna falla.
 
 Para usar la web contra la hoja simulada, levantá el servidor local (queda en
-`http://localhost:8787/exec`, con `/__estado` para ver el contenido de cada pestaña y
-`/__reiniciar` para volver al estado inicial):
+`http://localhost:8787/exec`, con `/__estado` para ver el contenido de cada pestaña,
+`/__correos` para ver los correos que "envió" y `/__reiniciar` para volver al estado inicial):
 
 ```bash
 npm run sheets:local
@@ -318,13 +338,11 @@ Los datos de contacto y el nombre de la empresa se editan en un solo lugar:
 ## 8. Limitaciones conocidas
 
 - **Las fotos no se comparten entre dispositivos.** Quedan en el equipo que publicó.
-- **No hay recuperación de contraseña.** Si alguien la olvida, hay que borrar a mano su fila de
-  la pestaña Usuarios para que pueda registrarse de nuevo (sus publicaciones quedan con el id
-  anterior).
-- **Cuentas de la versión anterior.** Solo se pueden activar desde el navegador donde se crearon.
-  Si ese navegador ya no tiene los datos, se resuelve igual que una contraseña olvidada.
-- **No hay límite de intentos de contraseña.** El hash es lento a propósito, pero el script no
-  bloquea a quien prueba muchas contraseñas seguidas.
+- **Recuperar la contraseña depende del correo.** Si alguien perdió el acceso al correo de su
+  cuenta, hay que borrar a mano su fila de la pestaña Usuarios para que se registre de nuevo.
+- **No hay límite de intentos de contraseña al ingresar.** El hash es lento a propósito, pero el
+  script no bloquea a quien prueba muchas contraseñas seguidas (los códigos de recuperación sí
+  tienen límite).
 - **El script atiende un pedido de escritura a la vez** (LockService). Alcanza para un proyecto
   de este tamaño; con muchos usuarios simultáneos las respuestas se harían lentas.
 - **Si una publicación se edita en dos dispositivos a la vez**, queda la última versión que llegó
@@ -338,7 +356,6 @@ Los datos de contacto y el nombre de la empresa se editan en un solo lugar:
 | Funcionalidad | Dónde se conecta |
 | --- | --- |
 | Fotos compartidas entre dispositivos (Google Drive) | `services/imagenes.ts` y el Apps Script |
-| Recuperar la contraseña por correo | Apps Script (`MailApp`) y `services/auth.ts` |
 | Registrar las operaciones concretadas (cantidad, precio, con quién) | Nuevos campos en `Publicacion` |
 | Publicar demanda ("busco cartón en el D-8") y alertas | Nueva entidad sobre el repositorio |
 | Calificaciones y verificación de empresas | Nuevos campos en `Usuario` |

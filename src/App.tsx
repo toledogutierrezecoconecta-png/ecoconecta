@@ -13,6 +13,7 @@ import { Panel } from './pages/Panel'
 import { Precios } from './pages/Precios'
 import { Perfil } from './pages/Perfil'
 import { PublicarResiduo } from './pages/PublicarResiduo'
+import { Recuperar } from './pages/Recuperar'
 
 /** Al cambiar de ruta la vista vuelve arriba, como en una navegación real. */
 function IrArriba() {
@@ -42,6 +43,7 @@ export default function App() {
               <Route path="/residuo/:id" element={<DetalleResiduo />} />
               <Route path="/publicar" element={<PublicarResiduo />} />
               <Route path="/acceso" element={<Acceso />} />
+              <Route path="/recuperar" element={<Recuperar />} />
               <Route path="/panel" element={<Panel />} />
               <Route path="/perfil" element={<Perfil />} />
               <Route path="/como-funciona" element={<ComoFunciona />} />

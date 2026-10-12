@@ -96,7 +96,15 @@ const aBytes = (buffer) => [...buffer].map((b) => (b > 127 ? b - 256 : b))
 const deBytes = (bytes) => Buffer.from(bytes.map((b) => (b < 0 ? b + 256 : b)))
 
 export function cargarScript(rutaCodigo, libro = new Libro()) {
+  /** Correos que el script "envió". No sale nada a internet. */
+  const correos = []
+
   const contexto = vm.createContext({
+    MailApp: {
+      sendEmail: (opciones) => correos.push(opciones),
+      getRemainingDailyQuota: () => 100,
+    },
+    Session: { getEffectiveUser: () => ({ getEmail: () => 'duenio@ejemplo.test' }) },
     SpreadsheetApp: { getActiveSpreadsheet: () => libro },
     ContentService: {
       MimeType: { JSON: 'application/json' },
@@ -132,6 +140,7 @@ export function cargarScript(rutaCodigo, libro = new Libro()) {
   const leer = (salida) => JSON.parse(salida.getContent())
   return {
     libro,
+    correos,
     post: (accion, datos = {}, token = '') =>
       leer(contexto.doPost({ parameter: { accion, datos: JSON.stringify(datos), token } })),
     get: (accion = 'listar_publicaciones') => leer(contexto.doGet({ parameter: { accion } })),

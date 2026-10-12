@@ -57,12 +57,28 @@ export async function iniciarSesion(correo: string, clave: string): Promise<Usua
 
     if (respuesta.codigo === 'cuenta_sin_clave') {
       throw new Error(
-        'Esta cuenta se creó en otro dispositivo con una versión anterior. Ingresá una vez desde ese dispositivo para activarla en todos los demás.',
+        'Esta cuenta se creó con una versión anterior y todavía no tiene contraseña. Activala con "¿Olvidaste tu contraseña?": te mandamos un código a tu correo.',
       )
     }
     throw new Error('No encontramos una cuenta con ese correo. Registrate para continuar.')
   }
 
+  return abrirSesion(respuesta)
+}
+
+/**
+ * Pide un código para restablecer la contraseña. La hoja responde igual
+ * exista o no la cuenta, así que esto no revela qué correos están registrados.
+ */
+export async function solicitarRecuperacion(correo: string): Promise<void> {
+  const respuesta = await llamar('solicitar_recuperacion', { correo })
+  if (!respuesta) throw new Error(SIN_CONEXION)
+  if (!respuesta.ok) throw new Error(respuesta.error ?? 'No se pudo enviar el código.')
+}
+
+/** Con el código del correo, guarda la contraseña nueva e inicia sesión. */
+export async function restablecerClave(correo: string, codigo: string, clave: string): Promise<Usuario> {
+  const respuesta = (await llamar('restablecer_clave', { correo, codigo, clave })) as RespuestaSesion | null
   return abrirSesion(respuesta)
 }
 

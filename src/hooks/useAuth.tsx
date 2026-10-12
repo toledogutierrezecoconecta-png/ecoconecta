@@ -10,6 +10,8 @@ interface ContextoAuth {
   registrar: (credenciales: CredencialesRegistro) => Promise<Usuario>
   iniciarSesion: (correo: string, clave: string) => Promise<Usuario>
   cerrarSesion: () => void
+  /** Con el código recibido por correo, guarda la contraseña nueva e inicia sesión. */
+  restablecerClave: (correo: string, codigo: string, clave: string) => Promise<Usuario>
   /** Guarda el perfil en la hoja. Devuelve cuántas publicaciones recibieron los datos nuevos. */
   actualizarPerfil: (cambios: PerfilEditable) => Promise<number>
 }
@@ -41,6 +43,12 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
     return encontrado
   }, [])
 
+  const restablecerClave = useCallback(async (correo: string, codigo: string, clave: string) => {
+    const recuperado = await servicioAuth.restablecerClave(correo, codigo, clave)
+    setUsuario(recuperado)
+    return recuperado
+  }, [])
+
   const cerrarSesion = useCallback(() => {
     servicioAuth.cerrarSesion()
     setUsuario(null)
@@ -57,8 +65,8 @@ export function ProveedorAuth({ children }: { children: ReactNode }) {
   }, [])
 
   const valor = useMemo(
-    () => ({ usuario, registrar, iniciarSesion, cerrarSesion, actualizarPerfil }),
-    [usuario, registrar, iniciarSesion, cerrarSesion, actualizarPerfil],
+    () => ({ usuario, registrar, iniciarSesion, restablecerClave, cerrarSesion, actualizarPerfil }),
+    [usuario, registrar, iniciarSesion, restablecerClave, cerrarSesion, actualizarPerfil],
   )
 
   return <Contexto.Provider value={valor}>{children}</Contexto.Provider>

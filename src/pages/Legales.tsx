@@ -132,6 +132,7 @@ export function Privacidad() {
           parrafos: [
             'Las cuentas, las publicaciones, las publicaciones guardadas y los contactos se guardan en una hoja de cálculo de Google administrada por el equipo de EcoConecta SCZ. El navegador guarda una copia para mostrarla más rápido.',
             'La contraseña viaja cifrada (HTTPS) y en la hoja se guarda convertida en un código del que no se puede recuperar la contraseña original. Nadie del equipo puede verla.',
+            'Si el usuario pide restablecer su contraseña, la plataforma le envía un código de un solo uso al correo de su cuenta, desde la cuenta de correo de EcoConecta SCZ. El correo electrónico no se usa para otros envíos.',
             'Las fotografías se guardan únicamente en el dispositivo desde el que se realizó la publicación.',
           ],
         },

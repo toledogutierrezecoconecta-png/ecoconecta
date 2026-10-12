@@ -197,5 +197,97 @@ if (CODIGO) {
     assert.equal(s.post('borrar_todo', {}).codigo, 'accion_desconocida')
   })
 
+  console.log('\nRecuperar la contraseña')
+  const ultimoCodigo = () => s.correos.at(-1).subject.match(/(\d{6})$/)[1]
+  const filaRecuperacion = (correo) => hoja('Recuperaciones').filter((f) => f[0] === correo).at(-1)
+
+  prueba('con un correo que no existe responde igual y no manda nada', () => {
+    const antes = s.correos.length
+    assert.equal(s.post('solicitar_recuperacion', { correo: 'nadie@ejemplo.test' }).ok, true)
+    assert.equal(s.correos.length, antes)
+  })
+  prueba('manda un código de 6 dígitos al correo de la cuenta', () => {
+    assert.equal(s.post('solicitar_recuperacion', { correo: 'ANA@ejemplo.test' }).ok, true)
+    const correo = s.correos.at(-1)
+    assert.equal(correo.to, 'ana@ejemplo.test')
+    assert.match(ultimoCodigo(), /^\d{6}$/)
+    assert.ok(correo.htmlBody.includes(ultimoCodigo()))
+    assert.ok(correo.body.includes('#/recuperar?correo=ana%40ejemplo.test'))
+  })
+  prueba('el código no queda guardado tal cual en la hoja', () => {
+    assert.ok(!filaRecuperacion('ana@ejemplo.test').includes(ultimoCodigo()))
+    assert.ok(!filaRecuperacion('ana@ejemplo.test').includes(Number(ultimoCodigo())))
+  })
+  prueba('un código incorrecto avisa cuántos intentos quedan', () => {
+    const r = s.post('restablecer_clave', { correo: 'ana@ejemplo.test', codigo: '000000', clave: 'nueva123' })
+    assert.equal(r.codigo, 'codigo_invalido')
+    assert.match(r.error, /Te quedan 4 intentos/)
+  })
+  prueba('con el código correcto cambia la contraseña e inicia sesión', () => {
+    const viejaSesion = s.post('iniciar_sesion', { correo: 'ana@ejemplo.test', clave: 'secreta1' }).token
+    const r = s.post('restablecer_clave', { correo: 'ana@ejemplo.test', codigo: ultimoCodigo(), clave: 'nueva123' })
+    assert.equal(r.ok, true, JSON.stringify(r))
+    assert.ok(r.token)
+    assert.equal(s.post('iniciar_sesion', { correo: 'ana@ejemplo.test', clave: 'secreta1' }).codigo, 'credenciales')
+    assert.equal(s.post('iniciar_sesion', { correo: 'ana@ejemplo.test', clave: 'nueva123' }).ok, true)
+    assert.equal(s.post('mi_actividad', {}, viejaSesion).codigo, 'sesion_invalida', 'las sesiones anteriores se cierran')
+    assert.equal(s.post('mi_actividad', {}, r.token).ok, true)
+  })
+  prueba('el código sirve una sola vez', () => {
+    const r = s.post('restablecer_clave', { correo: 'ana@ejemplo.test', codigo: ultimoCodigo(), clave: 'otra1234' })
+    assert.equal(r.codigo, 'codigo_invalido')
+  })
+  prueba('después de 5 intentos fallidos el código se bloquea aunque se acierte', () => {
+    s.post('solicitar_recuperacion', { correo: 'ana@ejemplo.test' })
+    const bueno = ultimoCodigo()
+    const malo = bueno === '111111' ? '222222' : '111111'
+    let ultima
+    for (let i = 0; i < 5; i++) ultima = s.post('restablecer_clave', { correo: 'ana@ejemplo.test', codigo: malo, clave: 'otra1234' })
+    assert.equal(ultima.codigo, 'demasiados_intentos')
+    assert.equal(s.post('restablecer_clave', { correo: 'ana@ejemplo.test', codigo: bueno, clave: 'otra1234' }).codigo, 'demasiados_intentos')
+  })
+  prueba('como máximo 3 códigos por hora para el mismo correo', () => {
+    // Ya se pidieron 2 en esta hora para ana: el tercero pasa, el cuarto no.
+    assert.equal(s.post('solicitar_recuperacion', { correo: 'ana@ejemplo.test' }).ok, true)
+    assert.equal(s.post('solicitar_recuperacion', { correo: 'ana@ejemplo.test' }).codigo, 'limite_envios')
+  })
+  prueba('un código nuevo anula el anterior', () => {
+    s.post('solicitar_recuperacion', { correo: 'mendez@ejemplo.test' })
+    const primero = ultimoCodigo()
+    s.post('solicitar_recuperacion', { correo: 'mendez@ejemplo.test' })
+    const segundo = ultimoCodigo()
+    if (primero !== segundo) {
+      assert.equal(s.post('restablecer_clave', { correo: 'mendez@ejemplo.test', codigo: primero, clave: 'mendez123' }).codigo, 'codigo_invalido')
+    }
+  })
+  prueba('un código vencido no sirve', () => {
+    const codigo = ultimoCodigo()
+    filaRecuperacion('mendez@ejemplo.test')[4] = Date.now() - 1000
+    assert.equal(s.post('restablecer_clave', { correo: 'mendez@ejemplo.test', codigo, clave: 'mendez123' }).codigo, 'codigo_vencido')
+  })
+  prueba('una cuenta vieja sin contraseña se activa con el código del correo', () => {
+    assert.equal(s.post('iniciar_sesion', { correo: 'mendez@ejemplo.test', clave: 'mendez123' }).codigo, 'cuenta_sin_clave')
+    s.post('solicitar_recuperacion', { correo: 'mendez@ejemplo.test' })
+    const r = s.post('restablecer_clave', { correo: 'mendez@ejemplo.test', codigo: ultimoCodigo(), clave: 'mendez123' })
+    assert.equal(r.ok, true, JSON.stringify(r))
+    assert.equal(r.usuario.id, 'usr-viejo-2', 'conserva su id y sus publicaciones')
+    assert.equal(s.post('iniciar_sesion', { correo: 'mendez@ejemplo.test', clave: 'mendez123' }).ok, true)
+  })
+  prueba('200 recuperaciones seguidas funcionan (hashes que empiezan con "+")', () => {
+    // El hash del código en base64 empieza con "+" una de cada 64 veces; sin
+    // seguro() Sheets lo tomaría como fórmula y el código nunca coincidiría.
+    for (let i = 0; i < 200; i++) {
+      hoja('Recuperaciones').forEach((fila, n) => {
+        if (n > 0) fila[3] = '2000-01-01T00:00:00.000Z' // fuera del límite por hora
+      })
+      assert.equal(s.post('solicitar_recuperacion', { correo: 'mendez@ejemplo.test' }).ok, true)
+      const r = s.post('restablecer_clave', { correo: 'mendez@ejemplo.test', codigo: ultimoCodigo(), clave: 'mendez123' })
+      assert.equal(r.ok, true, `falló en la vuelta ${i + 1}: ${JSON.stringify(r)}`)
+    }
+  })
+  prueba('una contraseña nueva demasiado corta se rechaza', () => {
+    assert.equal(s.post('restablecer_clave', { correo: 'mendez@ejemplo.test', codigo: '123456', clave: '123' }).codigo, 'datos_invalidos')
+  })
+
   console.log(`\n${pasadas} pruebas pasaron${process.exitCode ? ', hay fallas' : ''}.`)
 }

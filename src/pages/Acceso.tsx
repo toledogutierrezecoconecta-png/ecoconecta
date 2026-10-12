@@ -171,6 +171,18 @@ export function Acceso() {
             required
           />
 
+          {modo === 'ingreso' && (
+            <div className="-mt-1 text-right">
+              <Link
+                to="/recuperar"
+                state={{ correo: formulario.correo }}
+                className="text-sm font-semibold text-marca-700 hover:underline"
+              >
+                ¿Olvidaste tu contraseña?
+              </Link>
+            </div>
+          )}
+
           {modo === 'registro' && (
             <fieldset>
               <legend className="mb-2 block text-sm font-semibold text-humo-700">

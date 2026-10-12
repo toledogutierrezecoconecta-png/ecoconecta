@@ -27,6 +27,9 @@ http
         salida = script.doPost(Object.fromEntries(new URLSearchParams(cuerpo)))
       } else if (url.pathname === '/__estado') {
         salida = JSON.stringify(script.libro.volcar())
+      } else if (url.pathname === '/__correos') {
+        // Los correos que el script "envió" (nada sale a internet).
+        salida = JSON.stringify(script.correos)
       } else if (url.pathname === '/__reiniciar') {
         script = cargarScript(CODIGO, libroComoElReal())
         salida = JSON.stringify({ ok: true })

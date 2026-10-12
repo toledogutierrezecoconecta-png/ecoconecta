@@ -13,10 +13,11 @@
  *   - Publicaciones: solo el dueño puede editarlas o eliminarlas.
  *   - Contactos: quién consultó por cada publicación (una vez por cuenta).
  *   - Guardados: las publicaciones que cada usuario marcó con el corazón.
+ *   - Recuperar la contraseña con un código de 6 dígitos enviado por correo.
  *
  * Hojas que usa (se crean solas, y si les faltan columnas se agregan al final):
  *
- *   Usuarios, Publicaciones, Contactos, Sesiones, Guardados
+ *   Usuarios, Publicaciones, Contactos, Sesiones, Guardados, Recuperaciones
  *
  * INSTALACIÓN: ver README.md, sección "Publicar cambios". Este archivo se sube
  * con clasp (npm run sheets:publicar); no hace falta copiarlo a mano.
@@ -86,6 +87,15 @@ var COLUMNAS_SESIONES = ['token', 'usuarioId', 'creadaEn', 'expiraEn']
 
 var COLUMNAS_GUARDADOS = ['usuarioId', 'publicacionId', 'fecha']
 
+/** Códigos para restablecer la contraseña. El código se guarda como hash, nunca tal cual. */
+var HOJA_RECUPERACIONES = 'Recuperaciones'
+var COLUMNAS_RECUPERACIONES = ['correo', 'hashCodigo', 'sal', 'creadoEn', 'expiraEn', 'intentos', 'usado']
+
+var MINUTOS_CODIGO = 15
+var INTENTOS_CODIGO = 5
+var CODIGOS_POR_HORA = 3
+var URL_SITIO = 'https://toledogutierrezecoconecta-png.github.io/ecoconecta/'
+
 var DIAS_SESION = 60
 var ITERACIONES_HASH = 1000
 var LARGO_MAXIMO = 2000
@@ -96,6 +106,12 @@ var ESTADOS = ['disponible', 'pausada', 'concretada']
 
 /** Devuelve la hoja; si no existe la crea, y si le faltan columnas las agrega al final. */
 function obtenerHoja(nombre, columnas) {
+  // Si se ejecuta sola desde el editor (sin nombre ni columnas), no crea
+  // una pestaña vacía: avisa qué función había que elegir.
+  if (!nombre || !columnas) {
+    throw new Error('Esta función no se ejecuta sola. Elegí "autorizarCorreo" en el menú de funciones y tocá Ejecutar.')
+  }
+
   var libro = SpreadsheetApp.getActiveSpreadsheet()
   var hoja = libro.getSheetByName(nombre)
 
@@ -236,7 +252,12 @@ function crearSesion(usuarioId) {
   var token = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '')
   var ahora = Date.now()
 
-  hoja.appendRow([token, usuarioId, new Date(ahora).toISOString(), ahora + DIAS_SESION * 86400000])
+  hoja.appendRow(
+    filaDesdeObjeto(
+      { token: token, usuarioId: usuarioId, creadaEn: new Date(ahora).toISOString(), expiraEn: ahora + DIAS_SESION * 86400000 },
+      COLUMNAS_SESIONES,
+    ),
+  )
   return token
 }
 
@@ -359,6 +380,174 @@ function reclamarCuenta(datos) {
 
   hoja.appendRow(filaDesdeObjeto(fila, COLUMNAS_USUARIOS))
   return entregarSesion(fila)
+}
+
+// ================================================== recuperar la contraseña
+
+function hashCodigo(codigo, sal) {
+  return Utilities.base64Encode(
+    Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, sal + codigo, Utilities.Charset.UTF_8),
+  )
+}
+
+/** Código de 6 dígitos a partir de un UUID (más aleatorio que Math.random). */
+function generarCodigo() {
+  var numero = parseInt(Utilities.getUuid().replace(/-/g, '').slice(0, 12), 16) % 1000000
+  return ('000000' + numero).slice(-6)
+}
+
+/**
+ * Envía un código por correo para restablecer la contraseña.
+ *
+ * Siempre responde lo mismo exista o no la cuenta, para que nadie pueda usar
+ * esta pantalla para averiguar qué correos están registrados.
+ */
+function solicitarRecuperacion(datos) {
+  var correo = texto(datos.correo, 200).toLowerCase()
+  if (!correoValido(correo)) return rechazo('datos_invalidos', 'El correo no es válido.')
+
+  var cuenta = buscar(leerFilas(obtenerHoja(HOJA_USUARIOS, COLUMNAS_USUARIOS), COLUMNAS_USUARIOS), 'correo', correo)
+  if (!cuenta) return respuesta({ ok: true })
+
+  var hoja = obtenerHoja(HOJA_RECUPERACIONES, COLUMNAS_RECUPERACIONES)
+  var filas = leerFilas(hoja, COLUMNAS_RECUPERACIONES)
+  var haceUnaHora = Date.now() - 3600000
+
+  var recientes = filas.filter(function (fila) {
+    return String(fila.correo) === correo && new Date(formatearMarcaTemporal(fila.creadoEn)).getTime() > haceUnaHora
+  })
+  if (recientes.length >= CODIGOS_POR_HORA) {
+    return rechazo('limite_envios', 'Ya enviamos varios códigos a este correo. Esperá una hora y probá de nuevo.')
+  }
+
+  // Un código nuevo anula los anteriores.
+  filas.forEach(function (fila) {
+    if (String(fila.correo) === correo && fila.usado !== true && String(fila.usado) !== 'TRUE') {
+      hoja.getRange(fila._fila, COLUMNAS_RECUPERACIONES.indexOf('usado') + 1).setValue(true)
+    }
+  })
+
+  var codigo = generarCodigo()
+  var sal = Utilities.getUuid()
+  var ahora = Date.now()
+  // filaDesdeObjeto pasa todo por seguro(): el hash en base64 puede empezar con
+  // "+" y Sheets lo tomaría como fórmula, y el código nunca coincidiría.
+  hoja.appendRow(
+    filaDesdeObjeto(
+      {
+        correo: correo,
+        hashCodigo: hashCodigo(codigo, sal),
+        sal: sal,
+        creadoEn: new Date(ahora).toISOString(),
+        expiraEn: ahora + MINUTOS_CODIGO * 60000,
+        intentos: 0,
+        usado: false,
+      },
+      COLUMNAS_RECUPERACIONES,
+    ),
+  )
+
+  var enlace = URL_SITIO + '#/recuperar?correo=' + encodeURIComponent(correo)
+  MailApp.sendEmail({
+    to: correo,
+    name: 'EcoConecta SCZ',
+    subject: 'Tu código para restablecer la contraseña: ' + codigo,
+    body:
+      'Hola ' + cuenta.contacto + ',\n\n' +
+      'Tu código para crear una contraseña nueva en EcoConecta SCZ es:\n\n' +
+      '    ' + codigo + '\n\n' +
+      'Vence en ' + MINUTOS_CODIGO + ' minutos y sirve una sola vez. Escribilo en:\n' + enlace + '\n\n' +
+      'Si no pediste este código, ignorá este correo: tu contraseña no cambia.\n\n' +
+      'EcoConecta SCZ — Santa Cruz de la Sierra',
+    htmlBody:
+      '<div style="font-family:Arial,sans-serif;max-width:480px;color:#222a26">' +
+      '<p>Hola ' + escaparHtml(cuenta.contacto) + ',</p>' +
+      '<p>Tu código para crear una contraseña nueva en <b>EcoConecta SCZ</b> es:</p>' +
+      '<p style="font-size:32px;font-weight:bold;letter-spacing:6px;color:#0f4a2d">' + codigo + '</p>' +
+      '<p>Vence en ' + MINUTOS_CODIGO + ' minutos y sirve una sola vez.</p>' +
+      '<p><a href="' + enlace + '" style="background:#16613c;color:#fff;padding:10px 18px;border-radius:10px;text-decoration:none;display:inline-block">Escribir el código</a></p>' +
+      '<p style="color:#6d7a74;font-size:13px">Si no pediste este código, ignorá este correo: tu contraseña no cambia.</p>' +
+      '</div>',
+  })
+
+  return respuesta({ ok: true })
+}
+
+function escaparHtml(valor) {
+  return String(valor).replace(/[&<>"']/g, function (caracter) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[caracter]
+  })
+}
+
+/** Cierra todas las sesiones de una cuenta (por ejemplo, al cambiar la contraseña). */
+function cerrarSesionesDe(usuarioId) {
+  var hoja = obtenerHoja(HOJA_SESIONES, COLUMNAS_SESIONES)
+  var filas = leerFilas(hoja, COLUMNAS_SESIONES)
+  // De abajo hacia arriba, para que borrar una fila no corra las siguientes.
+  for (var i = filas.length - 1; i >= 0; i--) {
+    if (String(filas[i].usuarioId) === usuarioId) hoja.deleteRow(filas[i]._fila)
+  }
+}
+
+/** Con el código correcto, guarda la contraseña nueva e inicia sesión. */
+function restablecerClave(datos) {
+  var correo = texto(datos.correo, 200).toLowerCase()
+  var codigo = texto(datos.codigo, 10).replace(/\D/g, '')
+  var clave = String(datos.clave || '')
+
+  if (clave.length < 6) return rechazo('datos_invalidos', 'La contraseña debe tener al menos 6 caracteres.')
+
+  var hoja = obtenerHoja(HOJA_RECUPERACIONES, COLUMNAS_RECUPERACIONES)
+  var vigente = null
+  leerFilas(hoja, COLUMNAS_RECUPERACIONES).forEach(function (fila) {
+    var usado = fila.usado === true || String(fila.usado) === 'TRUE'
+    if (String(fila.correo) === correo && !usado) vigente = fila
+  })
+
+  if (!vigente) return rechazo('codigo_invalido', 'El código no es válido. Pedí uno nuevo.')
+  if (Number(vigente.expiraEn) < Date.now()) return rechazo('codigo_vencido', 'El código venció. Pedí uno nuevo.')
+
+  var intentos = Number(vigente.intentos) || 0
+  if (intentos >= INTENTOS_CODIGO) {
+    return rechazo('demasiados_intentos', 'Demasiados intentos con este código. Pedí uno nuevo.')
+  }
+
+  if (hashCodigo(codigo, String(vigente.sal)) !== String(vigente.hashCodigo)) {
+    hoja.getRange(vigente._fila, COLUMNAS_RECUPERACIONES.indexOf('intentos') + 1).setValue(intentos + 1)
+    var quedan = INTENTOS_CODIGO - intentos - 1
+    return rechazo(
+      quedan > 0 ? 'codigo_invalido' : 'demasiados_intentos',
+      quedan > 0
+        ? 'El código no es correcto. ' + (quedan === 1 ? 'Te queda 1 intento.' : 'Te quedan ' + quedan + ' intentos.')
+        : 'Demasiados intentos con este código. Pedí uno nuevo.',
+    )
+  }
+
+  var hojaUsuarios = obtenerHoja(HOJA_USUARIOS, COLUMNAS_USUARIOS)
+  var cuenta = buscar(leerFilas(hojaUsuarios, COLUMNAS_USUARIOS), 'correo', correo)
+  if (!cuenta) return rechazo('codigo_invalido', 'El código no es válido. Pedí uno nuevo.')
+
+  hoja.getRange(vigente._fila, COLUMNAS_RECUPERACIONES.indexOf('usado') + 1).setValue(true)
+
+  var sal = Utilities.getUuid()
+  cuenta.hashClave = calcularHash(clave, sal)
+  cuenta.sal = sal
+  escribirFila(hojaUsuarios, cuenta._fila, cuenta, COLUMNAS_USUARIOS)
+
+  // Si alguien más tenía la sesión abierta, deja de servirle.
+  cerrarSesionesDe(String(cuenta.id))
+  return entregarSesion(cuenta)
+}
+
+/**
+ * Ejecutar UNA VEZ desde el editor de Apps Script antes de publicar esta
+ * versión: Google pide autorizar el permiso para enviar correos. Manda un
+ * correo de prueba a la cuenta dueña del script.
+ */
+function autorizarCorreo() {
+  var cuenta = Session.getEffectiveUser().getEmail()
+  MailApp.sendEmail(cuenta, 'EcoConecta SCZ: envío de correos autorizado', 'Listo: el script ya puede enviar los códigos para restablecer contraseñas.')
+  Logger.log('Correo de prueba enviado a ' + cuenta + '. Quedan ' + MailApp.getRemainingDailyQuota() + ' envíos hoy.')
 }
 
 function cerrarSesion(token) {
@@ -616,6 +805,8 @@ function doPost(e) {
     if (accion === 'registrar_usuario') return registrarUsuario(datos)
     if (accion === 'iniciar_sesion') return iniciarSesion(datos)
     if (accion === 'reclamar_cuenta') return reclamarCuenta(datos)
+    if (accion === 'solicitar_recuperacion') return solicitarRecuperacion(datos)
+    if (accion === 'restablecer_clave') return restablecerClave(datos)
     if (accion === 'cerrar_sesion') return cerrarSesion(token)
     if (accion === 'registrar_contacto') return registrarContacto(validarSesion(token), datos)
 
