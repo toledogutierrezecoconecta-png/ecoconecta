@@ -161,7 +161,7 @@ function formatearFecha(fecha, zona, formato) {
     .replace('mm', partes.minute)
 }
 
-export function cargarScript(rutaCodigo, libro = new Libro(), propiedades = {}) {
+export function cargarScript(rutaCodigo, libro = new Libro(), propiedades = {}, otrosLibros = {}) {
   /** Correos que el script "envió". No sale nada a internet. */
   const correos = []
   const cache = new Map()
@@ -172,7 +172,13 @@ export function cargarScript(rutaCodigo, libro = new Libro(), propiedades = {}) 
       getRemainingDailyQuota: () => 100,
     },
     Session: { getEffectiveUser: () => ({ getEmail: () => 'duenio@ejemplo.test' }) },
-    SpreadsheetApp: { getActiveSpreadsheet: () => libro },
+    SpreadsheetApp: {
+      getActiveSpreadsheet: () => libro,
+      openById: (id) => {
+        if (!otrosLibros[id]) throw new Error('No se encontró la hoja ' + id)
+        return otrosLibros[id]
+      },
+    },
     ContentService: {
       MimeType: { JSON: 'application/json' },
       createTextOutput: (contenido) => ({
