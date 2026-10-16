@@ -707,50 +707,6 @@ function fechaDesde(valor) {
   return isNaN(fecha.getTime()) ? new Date() : fecha
 }
 
-/** Una cuenta del formato anterior, lista para su pestaña por tipo (conserva hash y sal). */
-function cuentaAnterior(fila) {
-  var fecha = fechaDesde(fila.creadoEn)
-  fila.fecha = fecha
-  fila.hora = fecha
-  fila.tipo = HOJA_POR_TIPO[fila.tipo] ? fila.tipo : 'oferente'
-  fila.creadoEn = formatearMarcaTemporal(fila.creadoEn)
-  fila.telefono = normalizarTelefono(fila.telefono)
-  fila.correo = String(fila.correo).toLowerCase()
-  fila.correoConfirmacion = 'Registro anterior (sin correo)'
-  return fila
-}
-
-/** Una publicación del formato anterior, con Fecha y Hora. */
-function publicacionAnterior(fila) {
-  var creada = fechaDesde(fila.creadaEn)
-  fila.fecha = creada
-  fila.hora = creada
-  fila.creadaEn = formatearMarcaTemporal(fila.creadaEn)
-  fila.telefono = normalizarTelefono(fila.telefono)
-  fila.fechaDisponible = formatearFecha(fila.fechaDisponible)
-  return fila
-}
-
-/** Un contacto del formato anterior, con Fecha, Hora y el título de la publicación. */
-function contactoAnterior(fila, titulos) {
-  var fecha = fechaDesde(fila.fecha)
-  fila.fecha = fecha
-  fila.hora = fecha
-  fila.titulo = titulos[String(fila.publicacionId)] || '(publicación eliminada o de ejemplo)'
-  return fila
-}
-
-/** Títulos de las publicaciones actuales, por id. */
-function titulosDePublicaciones() {
-  var titulos = {}
-  leerFilas(obtenerHoja(HOJA_PUBLICACIONES, COLUMNAS_PUBLICACIONES), COLUMNAS_PUBLICACIONES).forEach(
-    function (publicacion) {
-      titulos[String(publicacion.id)] = String(publicacion.titulo)
-    },
-  )
-  return titulos
-}
-
 /** Renombra y oculta una pestaña vieja en lugar de borrarla. */
 function respaldar(hoja, nombre) {
   var libro = SpreadsheetApp.getActiveSpreadsheet()
@@ -801,7 +757,16 @@ function actualizarHojas() {
     var movidas = 0
     leerFilas(usuarios, ANTERIOR_USUARIOS).forEach(function (fila) {
       if (yaEstan[String(fila.id)] || /^PRUEBA CLAUDE/i.test(String(fila.empresa))) return
-      agregarCuenta(cuentaAnterior(fila))
+
+      var fecha = fechaDesde(fila.creadoEn)
+      fila.fecha = fecha
+      fila.hora = fecha
+      fila.tipo = HOJA_POR_TIPO[fila.tipo] ? fila.tipo : 'oferente'
+      fila.creadoEn = formatearMarcaTemporal(fila.creadoEn)
+      fila.telefono = normalizarTelefono(fila.telefono)
+      fila.correo = String(fila.correo).toLowerCase()
+      fila.correoConfirmacion = 'Registro anterior (sin correo)'
+      agregarCuenta(fila)
       movidas++
     })
 
@@ -817,7 +782,13 @@ function actualizarHojas() {
     var nuevas = obtenerHoja(HOJA_PUBLICACIONES, COLUMNAS_PUBLICACIONES)
 
     filasPublicaciones.forEach(function (fila) {
-      nuevas.appendRow(filaDesdeObjeto(publicacionAnterior(fila), COLUMNAS_PUBLICACIONES))
+      var creada = fechaDesde(fila.creadaEn)
+      fila.fecha = creada
+      fila.hora = creada
+      fila.creadaEn = formatearMarcaTemporal(fila.creadaEn)
+      fila.telefono = normalizarTelefono(fila.telefono)
+      fila.fechaDisponible = formatearFecha(fila.fechaDisponible)
+      nuevas.appendRow(filaDesdeObjeto(fila, COLUMNAS_PUBLICACIONES))
     })
     resumen.push('Publicaciones con fecha y hora: ' + filasPublicaciones.length)
   }
@@ -828,10 +799,19 @@ function actualizarHojas() {
     var filasContactos = leerFilas(contactos, ANTERIOR_CONTACTOS)
     respaldar(contactos, 'Contactos (respaldo)')
     var nuevosContactos = obtenerHoja(HOJA_CONTACTOS, COLUMNAS_CONTACTOS)
-    var titulos = titulosDePublicaciones()
+    var titulos = {}
+    leerFilas(obtenerHoja(HOJA_PUBLICACIONES, COLUMNAS_PUBLICACIONES), COLUMNAS_PUBLICACIONES).forEach(
+      function (publicacion) {
+        titulos[String(publicacion.id)] = String(publicacion.titulo)
+      },
+    )
 
     filasContactos.forEach(function (fila) {
-      nuevosContactos.appendRow(filaDesdeObjeto(contactoAnterior(fila, titulos), COLUMNAS_CONTACTOS))
+      var fecha = fechaDesde(fila.fecha)
+      fila.fecha = fecha
+      fila.hora = fecha
+      fila.titulo = titulos[String(fila.publicacionId)] || '(publicación eliminada o de ejemplo)'
+      nuevosContactos.appendRow(filaDesdeObjeto(fila, COLUMNAS_CONTACTOS))
     })
     resumen.push('Contactos con fecha y hora: ' + filasContactos.length)
   }
@@ -858,114 +838,6 @@ function actualizarHojas() {
       ? 'Clave de administrador: configurada'
       : 'Clave de administrador: FALTA (agregá CLAVE_ADMIN en las propiedades del script)',
   )
-
-  var texto = 'Listo.\n' + resumen.join('\n')
-  Logger.log(texto)
-  return texto
-}
-
-/**
- * Trae de una COPIA de la hoja (hecha desde Archivo → Historial de versiones)
- * lo que falte en la hoja actual: cuentas con su contraseña, publicaciones,
- * contactos y guardados. No pisa ni duplica nada de lo que ya está.
- *
- * Antes de ejecutarla: Configuración del proyecto → Propiedades de la
- * secuencia de comandos → agregar COPIA_RESPALDO con el enlace de la copia.
- * La copia debe tener el formato anterior (pestaña "Usuarios").
- */
-function recuperarDesdeCopia() {
-  var propiedades = PropertiesService.getScriptProperties()
-  var enlace = String(propiedades.getProperty('COPIA_RESPALDO') || '').trim()
-  if (!enlace) {
-    throw new Error('Falta la propiedad COPIA_RESPALDO con el enlace de la copia de la hoja.')
-  }
-
-  var coincidencia = /\/d\/([\w-]+)/.exec(enlace)
-  var copia = SpreadsheetApp.openById(coincidencia ? coincidencia[1] : enlace)
-  var usuariosCopia = copia.getSheetByName('Usuarios')
-  if (!usuariosCopia) {
-    throw new Error(
-      'La copia no tiene la pestaña "Usuarios". Hacé la copia de una versión anterior a las 15:39 del 16/10.',
-    )
-  }
-
-  var resumen = []
-
-  // Cuentas: por id, y sin repetir un correo que ya tenga cuenta.
-  var ids = {}
-  var correos = {}
-  leerCuentas().forEach(function (fila) {
-    ids[String(fila.id)] = true
-    correos[String(fila.correo).toLowerCase()] = true
-  })
-  var cuentas = 0
-  leerFilas(usuariosCopia, ANTERIOR_USUARIOS).forEach(function (fila) {
-    var correo = String(fila.correo).toLowerCase()
-    if (ids[String(fila.id)] || correos[correo] || /^PRUEBA CLAUDE/i.test(String(fila.empresa))) return
-    agregarCuenta(cuentaAnterior(fila))
-    ids[String(fila.id)] = true
-    correos[correo] = true
-    cuentas++
-  })
-  resumen.push('Cuentas recuperadas: ' + cuentas)
-
-  // Publicaciones: por id.
-  var hojaPublicaciones = obtenerHoja(HOJA_PUBLICACIONES, COLUMNAS_PUBLICACIONES)
-  var publicacionesCopia = copia.getSheetByName(HOJA_PUBLICACIONES)
-  var publicaciones = 0
-  if (publicacionesCopia && String(publicacionesCopia.getRange(1, 1).getValue()) === 'id') {
-    var actuales = {}
-    leerFilas(hojaPublicaciones, COLUMNAS_PUBLICACIONES).forEach(function (fila) {
-      actuales[String(fila.id)] = true
-    })
-    leerFilas(publicacionesCopia, ANTERIOR_PUBLICACIONES).forEach(function (fila) {
-      if (actuales[String(fila.id)] || /^PRUEBA CLAUDE/i.test(String(fila.titulo))) return
-      hojaPublicaciones.appendRow(filaDesdeObjeto(publicacionAnterior(fila), COLUMNAS_PUBLICACIONES))
-      actuales[String(fila.id)] = true
-      publicaciones++
-    })
-  }
-  resumen.push('Publicaciones recuperadas: ' + publicaciones)
-
-  // Contactos: por publicación, cuenta y momento exacto.
-  var hojaContactos = obtenerHoja(HOJA_CONTACTOS, COLUMNAS_CONTACTOS)
-  var contactosCopia = copia.getSheetByName(HOJA_CONTACTOS)
-  var contactos = 0
-  if (contactosCopia && String(contactosCopia.getRange(1, 1).getValue()) === 'publicacionId') {
-    var clave = function (fila) {
-      return [String(fila.publicacionId), String(fila.usuarioId), fechaDesde(fila.fecha).getTime()].join('|')
-    }
-    var vistos = {}
-    leerFilas(hojaContactos, COLUMNAS_CONTACTOS).forEach(function (fila) {
-      vistos[clave(fila)] = true
-    })
-    var titulos = titulosDePublicaciones()
-    leerFilas(contactosCopia, ANTERIOR_CONTACTOS).forEach(function (fila) {
-      if (vistos[clave(fila)]) return
-      vistos[clave(fila)] = true
-      hojaContactos.appendRow(filaDesdeObjeto(contactoAnterior(fila, titulos), COLUMNAS_CONTACTOS))
-      contactos++
-    })
-  }
-  resumen.push('Contactos recuperados: ' + contactos)
-
-  // Guardados (♡): por cuenta y publicación.
-  var hojaGuardados = obtenerHoja(HOJA_GUARDADOS, COLUMNAS_GUARDADOS)
-  var guardadosCopia = copia.getSheetByName(HOJA_GUARDADOS)
-  var guardados = 0
-  if (guardadosCopia) {
-    var marcados = {}
-    leerFilas(hojaGuardados, COLUMNAS_GUARDADOS).forEach(function (fila) {
-      marcados[fila.usuarioId + '|' + fila.publicacionId] = true
-    })
-    leerFilas(guardadosCopia, COLUMNAS_GUARDADOS).forEach(function (fila) {
-      if (marcados[fila.usuarioId + '|' + fila.publicacionId]) return
-      marcados[fila.usuarioId + '|' + fila.publicacionId] = true
-      hojaGuardados.appendRow(filaDesdeObjeto(fila, COLUMNAS_GUARDADOS))
-      guardados++
-    })
-  }
-  resumen.push('Guardados recuperados: ' + guardados)
 
   var texto = 'Listo.\n' + resumen.join('\n')
   Logger.log(texto)

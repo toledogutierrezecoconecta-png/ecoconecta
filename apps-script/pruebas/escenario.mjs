@@ -42,28 +42,3 @@ export function libroComoElReal() {
   libro.insertSheet('Sesiones').appendRow(['token', 'usuarioId', 'creadaEn', 'expiraEn'])
   return libro
 }
-
-/**
- * Lo que pasó el 16/10: la hoja se restauró a una versión vieja (sin las
- * cuentas ni la publicación de la imprenta) y se convirtió. Devuelve esa hoja
- * y una copia de la versión correcta, de donde hay que recuperar lo que falta.
- */
-export function hojaRestauradaDeMasYCopia() {
-  const actual = libroComoElReal()
-  const usuarios = actual.getSheetByName('Usuarios')
-  usuarios.datos = usuarios.datos.filter((fila) => fila[0] !== 'usr-imprenta')
-  const contactos = actual.getSheetByName('Contactos')
-  contactos.datos = contactos.datos.slice(0, 1)
-
-  const copia = libroComoElReal()
-  // En la copia, además, una cuenta que después se volvió a registrar con el mismo correo.
-  copia.getSheetByName('Usuarios').appendRow(['usr-duplicada', 'Repetida', 'Rita', '70000013', 'rita@ejemplo.test', 'ambos', '2026-10-14T10:00:00.000Z', '', '', ''])
-  const columnas = copia.getSheetByName('Publicaciones').datos[0]
-  const valores = { id: 'pub-carton', titulo: 'CARTON', categoriaId: 'secos', materialId: 'carton-prensado', descripcion: 'Cartón de imprenta', cantidad: '60', unidad: 'kg', frecuencia: 'Semanal', zona: 'DM-5', direccion: 'Prueba', modalidadPrecio: 'referencia', valorEstimadoMin: '30', valorEstimadoMax: '45', fechaDisponible: '2026-10-12', estado: 'disponible', contactos: '0', usuarioId: 'usr-imprenta', empresa: 'Imprenta Prueba', contacto: 'Melisa Prueba', telefono: '70000012', creadaEn: '2026-10-12T16:31:16.929Z', origen: 'usuario' }
-  copia.getSheetByName('Publicaciones').appendRow(columnas.map((c) => valores[c]))
-  const guardados = copia.insertSheet('Guardados')
-  guardados.appendRow(['usuarioId', 'publicacionId', 'fecha'])
-  guardados.appendRow(['usr-imprenta', 'pub-viejo-1', '2026-10-13T15:00:00.000Z'])
-
-  return { actual, copia }
-}

@@ -1,7 +1,7 @@
 // Pruebas del Apps Script: ejecutan el Codigo.gs real sobre una hoja simulada.
 // Uso: npm run sheets:probar   (sheets:subir y sheets:publicar las corren antes de subir)
 import assert from 'node:assert/strict'
-import { CLAVE_IMPRENTA, hojaRestauradaDeMasYCopia, libroComoElReal } from './escenario.mjs'
+import { CLAVE_IMPRENTA, libroComoElReal } from './escenario.mjs'
 import { cargarScript } from './simulador.mjs'
 
 const CODIGO = process.argv[2]
@@ -420,54 +420,6 @@ if (CODIGO) {
   prueba('la versión del script se puede consultar', () => {
     assert.equal(s.get('estado').version, 3)
   })
-
-  console.log('\nRecuperar lo que faltó al restaurar (recuperarDesdeCopia)')
-  {
-    const { actual, copia } = hojaRestauradaDeMasYCopia()
-    const r = cargarScript(CODIGO, actual, {}, { 'id-de-la-copia': copia })
-    r.ejecutar('actualizarHojas')
-    const hojaR = (n) => r.libro.getSheetByName(n).datos
-    // Alguien se registró después de restaurar, con el mismo correo que una cuenta de la copia.
-    r.post('registrar_usuario', { empresa: 'Rita Nueva', contacto: 'Rita', telefono: '70000013', correo: 'rita@ejemplo.test', clave: 'rita1234', tipo: 'ambos' })
-
-    prueba('sin el enlace de la copia avisa qué falta', () => {
-      assert.throws(() => r.ejecutar('recuperarDesdeCopia'), /COPIA_RESPALDO/)
-    })
-    prueba('rechaza una copia que no tiene el formato anterior', () => {
-      r.propiedades.COPIA_RESPALDO = 'https://docs.google.com/spreadsheets/d/id-de-la-copia/edit'
-      const usuarios = copia.getSheetByName('Usuarios')
-      usuarios.setName('Otra')
-      assert.throws(() => r.ejecutar('recuperarDesdeCopia'), /no tiene la pestaña "Usuarios"/)
-      usuarios.setName('Usuarios')
-    })
-    prueba('trae la cuenta, la publicación, el contacto y el guardado que faltaban', () => {
-      const resumenR = r.ejecutar('recuperarDesdeCopia')
-      assert.match(resumenR, /Cuentas recuperadas: 1/)
-      assert.match(resumenR, /Publicaciones recuperadas: 1/)
-      assert.match(resumenR, /Contactos recuperados: 1/)
-      assert.match(resumenR, /Guardados recuperados: 1/)
-      assert.ok(hojaR('Recolectores').some((f) => f[9] === 'usr-imprenta'))
-      assert.equal(r.get().publicaciones.find((p) => p.id === 'pub-carton').titulo, 'CARTON')
-    })
-    prueba('la cuenta recuperada entra con su misma contraseña y ve su publicación', () => {
-      const sesion = r.post('iniciar_sesion', { correo: 'imprenta@ejemplo.test', clave: CLAVE_IMPRENTA })
-      assert.equal(sesion.ok, true, JSON.stringify(sesion))
-      assert.equal(r.get().publicaciones.find((p) => p.id === 'pub-carton').usuarioId, sesion.usuario.id)
-      assert.deepEqual([...r.post('mi_actividad', {}, sesion.token).guardados], ['pub-viejo-1'])
-    })
-    prueba('no pisa a quien se registró después con el mismo correo', () => {
-      const ritas = [...hojaR('Empresas'), ...hojaR('Recolectores'), ...hojaR('Ambos')].filter((f) => f[5] === 'rita@ejemplo.test')
-      assert.equal(ritas.length, 1)
-      assert.equal(ritas[0][2], 'Rita Nueva')
-    })
-    prueba('ejecutarla otra vez no duplica nada', () => {
-      const segunda = r.ejecutar('recuperarDesdeCopia')
-      assert.match(segunda, /Cuentas recuperadas: 0/)
-      assert.match(segunda, /Publicaciones recuperadas: 0/)
-      assert.match(segunda, /Contactos recuperados: 0/)
-      assert.match(segunda, /Guardados recuperados: 0/)
-    })
-  }
 
   console.log(`\n${pasadas} pruebas pasaron${process.exitCode ? ', hay fallas' : ''}.`)
 }
