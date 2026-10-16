@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import * as repositorio from '../services/publicaciones'
-import type { BorradorPublicacion, EstadoPublicacion, Publicacion, Usuario } from '../types'
+import type { BorradorPublicacion, EstadoPublicacion, MedioContacto, Publicacion, Usuario } from '../types'
 
 /**
  * Estado compartido de las publicaciones.
@@ -60,8 +60,8 @@ export function usePublicaciones() {
   )
 
   const contactar = useCallback(
-    async (id: string) => {
-      await repositorio.registrarContacto(id)
+    async (id: string, medio: MedioContacto) => {
+      await repositorio.registrarContacto(id, medio)
       await recargar()
     },
     [recargar],

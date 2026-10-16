@@ -1,4 +1,4 @@
-import type { Publicacion } from '../types'
+import type { MedioContacto, Publicacion } from '../types'
 import { valorDePublicacion } from '../utils/formato'
 import { haySheetsConfigurado, obtenerUrlSheets } from './config'
 import { marcarSesionVencida, obtenerToken } from './sesion'
@@ -113,8 +113,8 @@ export function sincronizarEliminacion(id: string): Promise<ResultadoEnvio> {
   return enviar('eliminar_publicacion', { id })
 }
 
-export function sincronizarContacto(id: string): Promise<ResultadoEnvio> {
-  return enviar('registrar_contacto', { id })
+export function sincronizarContacto(id: string, medio: MedioContacto): Promise<ResultadoEnvio> {
+  return enviar('registrar_contacto', { id, medio })
 }
 
 /**

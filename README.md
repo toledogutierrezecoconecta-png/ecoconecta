@@ -161,13 +161,13 @@ del script está en [`apps-script/Codigo.gs`](apps-script/Codigo.gs) y su URL en
 | **Recolectores** | Cuentas de tipo recolector / comprador. |
 | **Ambos** | Cuentas que ofrecen y buscan materiales. |
 | **Publicaciones** | Las ofertas del marketplace. Es la única pestaña de lectura pública. |
-| **Contactos** | Cada consulta: qué publicación, cuándo y, si tenía cuenta, quién. |
+| **Consultas** | Cada vez que alguien tocó **WhatsApp** o **Llamar** en una publicación: qué material, de quién era, quién consultó (o "Visitante sin cuenta"), cómo ubicarlo y por qué medio. Antes se llamaba "Contactos". |
 | **Sesiones** *(oculta)* | Llaves de sesión activas; vencen a los 60 días. |
 | **Guardados** *(oculta)* | Qué publicaciones guardó cada usuario. |
 | **Recuperaciones** *(oculta)* | Códigos para restablecer la contraseña (guardados como hash), con vencimiento e intentos. |
 
 - **Fecha y Hora** son las dos primeras columnas de Empresas, Recolectores, Ambos, Publicaciones
-  y Contactos, en hora de Bolivia (`America/La_Paz`). La hoja se configura en esa zona horaria.
+  y Consultas, en hora de Bolivia (`America/La_Paz`). La hoja se configura en esa zona horaria.
 - En las pestañas de cuentas, la contraseña se guarda como hash SHA-256 con sal en las columnas
   `hashClave` y `sal`, que quedan **ocultas**. Nunca en texto plano.
 - Si una cuenta cambia de tipo en su perfil, su fila se muda a la pestaña que corresponde.
@@ -176,6 +176,21 @@ del script está en [`apps-script/Codigo.gs`](apps-script/Codigo.gs) y su URL en
   que las filas existentes no se tocan.
 - Las pestañas que terminan en **(respaldo)** son las de la versión anterior a la actualización.
   Quedan ocultas y se pueden borrar una vez comprobado que todo funciona.
+
+### Consultas: para qué sirven
+
+Una **consulta** se registra cuando alguien, en el detalle de una publicación, toca **WhatsApp** o
+**Llamar** (abrir la ventana de contacto no cuenta). Sirve para:
+
+- **Quien publicó:** ver en su panel, en "Interesados en este material", qué negocios con cuenta lo
+  consultaron, cuándo y por qué medio, para hacerles seguimiento si no le escribieron.
+- **El administrador:** ver qué materiales generan interés y quién contacta a quién, en la pestaña
+  Consultas de la hoja o del panel.
+- **Todos:** el contador "N personas ya consultaron por este material" del detalle.
+
+Cada cuenta suma una sola vez por publicación; los visitantes sin cuenta se cuentan igual pero sin
+datos. Los títulos de la pestaña tienen una nota que explica cada columna. Las consultas
+anteriores al 17/10 tienen el medio "No registrado".
 
 ### Correo de confirmación
 
@@ -198,7 +213,7 @@ Hay dos formas de entrar, y las dos las valida el script (nada de esto está en 
   minutos. Desde esa misma pantalla se puede elegir "Ingresar con mi cuenta de administrador".
 
 Muestra un resumen con los registros de los últimos 7 días, las tablas de Empresas, Recolectores,
-Ambos, Publicaciones y Contactos con buscador, acceso directo por WhatsApp y correo, acciones para
+Ambos, Publicaciones y Consultas con buscador, acceso directo por WhatsApp y correo, acciones para
 pausar, activar o eliminar publicaciones, descarga a Excel (CSV) y un botón para abrir la hoja. La
 clave se recuerda solo hasta cerrar el navegador.
 

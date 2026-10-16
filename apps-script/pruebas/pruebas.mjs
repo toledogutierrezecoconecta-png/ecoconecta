@@ -38,7 +38,7 @@ if (CODIGO) {
     resumen = s.ejecutar('actualizarHojas')
     assert.match(resumen, /Cuentas repartidas en Empresas, Recolectores y Ambos: 3/)
     assert.match(resumen, /Publicaciones con fecha y hora: 2/)
-    assert.match(resumen, /Contactos con fecha y hora: 1/)
+    assert.match(resumen, /Consultas \(antes "Contactos"\): 1/)
     assert.match(resumen, /Clave de administrador: FALTA/)
   })
   prueba('pone la hoja en hora de Bolivia', () => {
@@ -63,13 +63,17 @@ if (CODIGO) {
   prueba('oculta el hash y la sal', () => {
     assert.ok(pestana('Recolectores').columnasOcultas.has(12) && pestana('Recolectores').columnasOcultas.has(13))
   })
-  prueba('las publicaciones y los contactos ganan fecha y hora sin perder nada', () => {
+  prueba('las publicaciones ganan fecha y hora sin perder nada', () => {
     assert.equal(hoja('Publicaciones')[0][0], 'Fecha')
     assert.ok(esFecha(hoja('Publicaciones')[1][0]))
-    const contacto = hoja('Contactos')[1]
-    assert.ok(esFecha(contacto[0]))
-    assert.equal(contacto[2], 'Aceite pub-viejo-1', 'se ve qué publicación consultaron')
-    assert.deepEqual([...contacto.slice(3)], ['pub-viejo-1', 'usr-imprenta', 'Imprenta Prueba', 'Melisa Prueba', 'recolector'])
+  })
+  prueba('"Contactos" pasa a "Consultas", con columnas que se explican solas', () => {
+    assert.deepEqual([...hoja('Consultas')[0].slice(0, 10)], ['Fecha', 'Hora', 'Material consultado', 'Publicado por', 'Consultado por', 'Persona que consultó', 'Teléfono de quien consultó', 'Correo de quien consultó', 'Tipo de cuenta de quien consultó', 'Medio'])
+    assert.match(pestana('Consultas').notas['1,3'], /Cada fila es una consulta/)
+    const consulta = hoja('Consultas')[1]
+    assert.ok(esFecha(consulta[0]))
+    assert.deepEqual([...consulta.slice(2, 10)], ['Aceite pub-viejo-1', 'Pollos Prueba', 'Imprenta Prueba', 'Melisa Prueba', '70000012', 'imprenta@ejemplo.test', 'recolector', 'No registrado'])
+    assert.equal(s.libro.getSheetByName('Contactos'), null)
   })
   prueba('no borra nada: las pestañas viejas quedan ocultas como respaldo', () => {
     for (const nombre of ['Usuarios (respaldo)', 'Publicaciones (respaldo)', 'Contactos (respaldo)']) {
@@ -80,13 +84,37 @@ if (CODIGO) {
   })
   prueba('oculta las pestañas técnicas y ordena las que se leen', () => {
     for (const nombre of ['Sesiones', 'Guardados', 'Recuperaciones']) assert.equal(pestana(nombre).oculta, true, nombre)
-    assert.deepEqual(s.libro.pestanas().slice(0, 5), ['Empresas', 'Recolectores', 'Ambos', 'Publicaciones', 'Contactos'])
+    assert.deepEqual(s.libro.pestanas().slice(0, 5), ['Empresas', 'Recolectores', 'Ambos', 'Publicaciones', 'Consultas'])
+  })
+  prueba('la columna de Publicaciones se llama "Consultas recibidas"', () => {
+    assert.ok(hoja('Publicaciones')[0].includes('Consultas recibidas'))
+    assert.ok(!hoja('Publicaciones')[0].includes('Contactos recibidos'))
+  })
+  prueba('una hoja con el título viejo "Contactos recibidos" no gana una columna de más', () => {
+    const otra = cargarScript(CODIGO, libroComoElReal())
+    otra.ejecutar('actualizarHojas')
+    const encabezado = otra.libro.getSheetByName('Publicaciones').datos[0]
+    encabezado[encabezado.indexOf('Consultas recibidas')] = 'Contactos recibidos'
+    const ancho = encabezado.length
+    otra.get()
+    assert.equal(otra.libro.getSheetByName('Publicaciones').datos[0].length, ancho)
+    otra.ejecutar('actualizarHojas')
+    assert.ok(otra.libro.getSheetByName('Publicaciones').datos[0].includes('Consultas recibidas'))
   })
   prueba('ejecutarla dos veces no duplica nada', () => {
     s.ejecutar('actualizarHojas')
     assert.equal(hoja('Empresas').length, 3)
     assert.equal(hoja('Publicaciones').length, 3)
-    assert.equal(hoja('Contactos').length, 2)
+    assert.equal(hoja('Consultas').length, 2)
+  })
+  prueba('convierte también "Contactos" con el formato del 16/10', () => {
+    const otra = cargarScript(CODIGO)
+    otra.libro.insertSheet('Contactos').appendRow(['Fecha', 'Hora', 'Título', 'ID publicación', 'ID usuario', 'Empresa / negocio', 'Contacto', 'Tipo'])
+    otra.libro.getSheetByName('Contactos').appendRow([new Date('2026-10-15T15:00:00Z'), new Date('2026-10-15T15:00:00Z'), 'Vidrio', 'pub-x', '', '', '', ''])
+    assert.match(otra.ejecutar('actualizarHojas'), /Consultas \(antes "Contactos"\): 1/)
+    const fila = otra.libro.getSheetByName('Consultas').datos[1]
+    assert.equal(fila[2], 'Vidrio')
+    assert.equal(fila[4], 'Visitante sin cuenta')
   })
   prueba('se niega a convertir una hoja con el formato del 16/10', () => {
     const otra = cargarScript(CODIGO)
@@ -208,15 +236,24 @@ if (CODIGO) {
     assert.notEqual(s.get().publicaciones.find((x) => x.id === 'pub-a').titulo, 'Hackeado')
   })
 
-  console.log('\nContactos')
+  console.log('\nConsultas')
   prueba('un visitante sin cuenta suma un contacto', () => {
     assert.equal(s.post('registrar_contacto', { id: 'pub-a' }).nuevo, true)
     assert.equal(s.get().publicaciones.find((x) => x.id === 'pub-a').contactos, 1)
   })
+  prueba('el visitante queda como "Visitante sin cuenta" y el medio sin registrar', () => {
+    const fila = hoja('Consultas').at(-1)
+    assert.equal(fila[4], 'Visitante sin cuenta')
+    assert.equal(fila[9], 'No registrado')
+  })
   prueba('una cuenta suma una sola vez, aunque contacte varias veces', () => {
-    assert.equal(s.post('registrar_contacto', { id: 'pub-a' }, tokenAna).nuevo, true)
+    assert.equal(s.post('registrar_contacto', { id: 'pub-a', medio: 'whatsapp' }, tokenAna).nuevo, true)
     assert.equal(s.post('registrar_contacto', { id: 'pub-a' }, tokenAna).nuevo, false)
     assert.equal(s.get().publicaciones.find((x) => x.id === 'pub-a').contactos, 2)
+  })
+  prueba('guarda quién consultó, cómo ubicarlo, quién publicó y por qué medio', () => {
+    const fila = hoja('Consultas').at(-1)
+    assert.deepEqual([...fila.slice(3, 10)], ['Imprenta Luis', 'Reciclajes Ana', 'Ana', '70000020', 'ana@ejemplo.test', 'recolector', 'WhatsApp'])
   })
   prueba('el dueño no se suma contactos a sí mismo', () => {
     assert.equal(s.post('registrar_contacto', { id: 'pub-a' }, tokenLuis).nuevo, false)
@@ -232,6 +269,7 @@ if (CODIGO) {
     assert.equal(r.contactos.length, 1)
     assert.equal(r.contactos[0].empresa, 'Reciclajes Ana')
     assert.equal(r.contactos[0].publicacionId, 'pub-a')
+    assert.equal(r.contactos[0].medio, 'WhatsApp')
   })
   prueba('los contactos de otros oferentes no se ven', () => {
     assert.equal(s.post('contactos_recibidos', {}, tokenAna).contactos.length, 0)
@@ -395,7 +433,10 @@ if (CODIGO) {
     assert.equal(pollos.tipo, 'oferente')
     assert.ok(r.publicaciones.length >= 3)
     assert.match(r.publicaciones[0].fecha, /^\d{2}\/\d{2}\/\d{4}$/)
-    assert.ok(r.contactos.some((c) => c.titulo === 'Aceite pub-viejo-1' && c.empresa === 'Imprenta Prueba'))
+    const consulta = r.contactos.find((c) => c.titulo === 'Aceite pub-viejo-1')
+    assert.equal(consulta.publicadoPor, 'Pollos Prueba')
+    assert.equal(consulta.consultadoPor, 'Imprenta Prueba')
+    assert.equal(consulta.telefono, '70000012')
     assert.equal(r.correosRestantesHoy, 100)
   })
   prueba('pausa, activa y elimina cualquier publicación', () => {
@@ -442,7 +483,7 @@ if (CODIGO) {
     assert.match(p.creadaEn, /^\d{4}-\d{2}-\d{2}T/)
   })
   prueba('la versión del script se puede consultar', () => {
-    assert.equal(s.get('estado').version, 4)
+    assert.equal(s.get('estado').version, 5)
   })
 
   console.log(`\n${pasadas} pruebas pasaron${process.exitCode ? ', hay fallas' : ''}.`)

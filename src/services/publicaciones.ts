@@ -2,6 +2,7 @@ import type {
   BorradorPublicacion,
   ContactoRecibido,
   EstadoPublicacion,
+  MedioContacto,
   Publicacion,
   Usuario,
   UsuarioAlmacenado,
@@ -322,7 +323,8 @@ export async function eliminarPublicacion(id: string): Promise<Resultado<void>> 
  * contador que devuelve ya incluya este contacto. Con sesión, la hoja anota
  * quién fue y no lo cuenta dos veces.
  */
-export async function registrarContacto(id: string): Promise<void> {
+/** Una consulta: alguien tocó WhatsApp o Llamar en la publicación. */
+export async function registrarContacto(id: string, medio: MedioContacto): Promise<void> {
   const publicaciones = cargarLocales()
   const indice = publicaciones.findIndex((publicacion) => publicacion.id === id)
   if (indice === -1) return
@@ -332,7 +334,7 @@ export async function registrarContacto(id: string): Promise<void> {
     contactos: publicaciones[indice].contactos + 1,
   }
   guardarLocales(publicaciones)
-  await sincronizarContacto(id)
+  await sincronizarContacto(id, medio)
 }
 
 /** Quién consultó por las publicaciones del usuario. null si no hubo conexión. */

@@ -53,6 +53,11 @@ class Rango {
   setFontWeight() {
     return this
   }
+  /** Nota al pasar el mouse por la celda. */
+  setNote(nota) {
+    this.hoja.notas[`${this.fila},${this.columna}`] = nota
+    return this
+  }
 }
 
 class Hoja {
@@ -61,6 +66,7 @@ class Hoja {
     this.libro = libro
     this.datos = []
     this.formatos = {}
+    this.notas = {}
     this.columnasOcultas = new Set()
     this.oculta = false
   }

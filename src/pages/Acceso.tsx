@@ -76,7 +76,7 @@ export function Acceso() {
           <p className="mt-2 text-sm text-humo-600">
             {modo === 'registro'
               ? 'Publicá materiales o encontrá los que tu negocio necesita.'
-              : 'Accedé a tus publicaciones y a los contactos recibidos.'}
+              : 'Accedé a tus publicaciones y a las consultas que recibiste.'}
           </p>
         </div>
 

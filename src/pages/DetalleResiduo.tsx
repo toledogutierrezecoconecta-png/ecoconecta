@@ -1,3 +1,4 @@
+import type { MedioContacto } from '../types'
 import { useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { BotonGuardar } from '../components/residuos/BotonGuardar'
@@ -65,10 +66,12 @@ export function DetalleResiduo() {
   const precioReferencia = buscarPrecio(publicacion.materialId)
   const valor = valorDePublicacion(publicacion)
 
-  // Cada persona suma un solo contacto, aunque abra la ventana varias veces.
-  const abrirContacto = () => {
-    setModalAbierto(true)
-    if (!esPropia && anotarContacto(publicacion.id)) void contactar(publicacion.id)
+  const abrirContacto = () => setModalAbierto(true)
+
+  // La consulta se registra al tocar WhatsApp o Llamar, no al abrir la ventana:
+  // así cuenta solo a quien realmente fue a contactar. Cada persona suma una vez.
+  const registrarConsulta = (medio: MedioContacto) => {
+    if (!esPropia && anotarContacto(publicacion.id)) void contactar(publicacion.id, medio)
   }
 
   const datos = [
@@ -256,10 +259,18 @@ export function DetalleResiduo() {
                 </div>
               )}
 
+              {puedeContactar && (
+                <p className="mt-3 text-center text-xs text-humo-500">
+                  Vas a ver el WhatsApp y el teléfono de {publicacion.empresa} para coordinar el
+                  retiro directamente.
+                </p>
+              )}
+
               {!esEjemplo && (
                 <p className="mt-3 text-center text-xs text-humo-500">
-                  {publicacion.contactos} {publicacion.contactos === 1 ? 'persona' : 'personas'} ya
-                  consultaron por este material
+                  {publicacion.contactos === 0
+                    ? 'Todavía nadie consultó por este material.'
+                    : `${publicacion.contactos} ${publicacion.contactos === 1 ? 'persona ya consultó' : 'personas ya consultaron'} por este material.`}
                 </p>
               )}
             </div>
@@ -299,7 +310,7 @@ export function DetalleResiduo() {
       <Modal
         abierto={modalAbierto}
         titulo={`Contactar a ${publicacion.empresa}`}
-        descripcion="Podés contactar al oferente para coordinar el retiro y negociar las condiciones."
+        descripcion="Elegí cómo contactarlo para coordinar el retiro y acordar las condiciones."
         onCerrar={() => setModalAbierto(false)}
       >
         <div className="space-y-3">
@@ -307,6 +318,7 @@ export function DetalleResiduo() {
             href={enlaceWhatsApp(publicacion, usuario)}
             target="_blank"
             rel="noreferrer"
+            onClick={() => registrarConsulta('whatsapp')}
             className="flex items-center gap-3 rounded-xl border border-humo-200 p-4 transition-colors hover:border-marca-400 hover:bg-marca-50"
           >
             <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#25D366]/10 text-[#128C7E]">
@@ -325,6 +337,7 @@ export function DetalleResiduo() {
 
           <a
             href={enlaceLlamada(publicacion.telefono)}
+            onClick={() => registrarConsulta('llamada')}
             className="flex items-center gap-3 rounded-xl border border-humo-200 p-4 transition-colors hover:border-marca-400 hover:bg-marca-50"
           >
             <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-marca-50 text-marca-700">
@@ -338,8 +351,14 @@ export function DetalleResiduo() {
           </a>
         </div>
 
+        <p className="mt-4 rounded-xl bg-marca-50 px-4 py-3 text-xs text-marca-800">
+          {usuario
+            ? `Al contactarlo, ${publicacion.empresa} verá en su panel que ${usuario.empresa} se interesó en este material.`
+            : `Al contactarlo se suma una consulta a esta publicación, para que ${publicacion.empresa} sepa cuánto interés hay.`}
+        </p>
+
         {!usuario && (
-          <p className="mt-4 rounded-xl bg-humo-50 px-4 py-3 text-xs text-humo-600">
+          <p className="mt-3 rounded-xl bg-humo-50 px-4 py-3 text-xs text-humo-600">
             <Link
               to={`/acceso?modo=registro&volver=${encodeURIComponent(`/residuo/${publicacion.id}`)}`}
               className="font-semibold text-marca-700 hover:underline"

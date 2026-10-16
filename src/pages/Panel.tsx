@@ -167,7 +167,7 @@ function PanelOferente({ mias, pendientes, cambiarEstado, eliminar }: PropsOfere
   const tarjetas: { icono: NombreIcono; valor: number; etiqueta: string }[] = [
     { icono: 'etiqueta', valor: resumen.activas, etiqueta: 'Publicaciones activas' },
     { icono: 'check', valor: resumen.concretadas, etiqueta: 'Publicaciones concretadas' },
-    { icono: 'telefono', valor: resumen.contactos, etiqueta: 'Contactos recibidos' },
+    { icono: 'telefono', valor: resumen.contactos, etiqueta: 'Consultas recibidas' },
     { icono: 'reciclaje', valor: resumen.materiales, etiqueta: 'Materiales publicados' },
   ]
 
@@ -308,7 +308,7 @@ function PanelOferente({ mias, pendientes, cambiarEstado, eliminar }: PropsOfere
                     <p className="mt-1 flex items-center gap-1.5 text-sm font-semibold text-marca-700">
                       <Icono nombre="telefono" className="h-4 w-4" />
                       {publicacion.contactos}{' '}
-                      {publicacion.contactos === 1 ? 'contacto recibido' : 'contactos recibidos'}
+                      {publicacion.contactos === 1 ? 'consulta recibida' : 'consultas recibidas'}
                     </p>
                   </div>
                 </div>
@@ -412,7 +412,7 @@ function PanelOferente({ mias, pendientes, cambiarEstado, eliminar }: PropsOfere
   )
 }
 
-/** Contactos recibidos agrupados por publicación. null mientras carga o si no hubo conexión. */
+/** Consultas recibidas agrupadas por publicación. null mientras carga o si no hubo conexión. */
 function useContactosRecibidos(): Map<string, ContactoRecibido[]> | null {
   const [porPublicacion, setPorPublicacion] = useState<Map<string, ContactoRecibido[]> | null>(null)
 
@@ -440,8 +440,9 @@ function useContactosRecibidos(): Map<string, ContactoRecibido[]> | null {
 const MAXIMO_VISIBLES = 3
 
 /**
- * Quién consultó por la publicación. Las personas con cuenta aparecen con su
- * empresa; los visitantes sin cuenta solo se cuentan.
+ * Interesados en la publicación: quienes tocaron WhatsApp o Llamar. Las
+ * personas con cuenta aparecen con su empresa; los visitantes sin cuenta solo
+ * se cuentan. Sirve para saber quién se interesó y hacerle seguimiento.
  */
 function QuienContacto({ contactos, total }: { contactos: ContactoRecibido[]; total: number }) {
   const [verTodos, setVerTodos] = useState(false)
@@ -453,7 +454,12 @@ function QuienContacto({ contactos, total }: { contactos: ContactoRecibido[]; to
 
   return (
     <div className="border-t border-humo-100 px-4 py-3">
-      <p className="text-xs font-semibold tracking-wide text-humo-500 uppercase">Te consultaron</p>
+      <p className="text-xs font-semibold tracking-wide text-humo-500 uppercase">
+        Interesados en este material
+      </p>
+      <p className="mt-0.5 text-xs text-humo-500">
+        Tocaron WhatsApp o Llamar en tu publicación. Si no te escribieron, podés buscarlos vos.
+      </p>
 
       <ul className="mt-2 space-y-1.5">
         {visibles.map((contacto) => (
@@ -466,7 +472,10 @@ function QuienContacto({ contactos, total }: { contactos: ContactoRecibido[]; to
             {contacto.tipo === 'recolector' && (
               <span className="text-xs text-marca-700">Recolector</span>
             )}
-            <span className="text-xs text-humo-500">· {formatearFechaHora(contacto.fecha)}</span>
+            <span className="text-xs text-humo-500">
+              · {formatearFechaHora(contacto.fecha)}
+              {contacto.medio && contacto.medio !== 'No registrado' && ` · por ${contacto.medio}`}
+            </span>
           </li>
         ))}
       </ul>

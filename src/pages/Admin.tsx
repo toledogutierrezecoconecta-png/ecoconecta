@@ -30,7 +30,7 @@ const SECCIONES: { valor: Seccion; texto: string }[] = [
   { valor: 'recolector', texto: 'Recolectores' },
   { valor: 'ambos', texto: 'Ambos' },
   { valor: 'publicaciones', texto: 'Publicaciones' },
-  { valor: 'contactos', texto: 'Contactos' },
+  { valor: 'contactos', texto: 'Consultas' },
 ]
 
 const SIETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000
@@ -178,7 +178,7 @@ export function Admin() {
                 etiqueta="Buscar"
                 type="search"
                 placeholder={
-                  seccion === 'contactos' ? 'Publicación o empresa' : 'Nombre, correo, teléfono…'
+                  seccion === 'contactos' ? 'Material, negocio o persona' : 'Nombre, correo, teléfono…'
                 }
                 value={busqueda}
                 onChange={(evento) => setBusqueda(evento.target.value)}
@@ -300,7 +300,7 @@ function Resumen({ datos, irA }: { datos: DatosAdmin; irA: (seccion: Seccion) =>
       seccion: 'contactos',
       icono: 'telefono',
       valor: datos.contactos.length,
-      etiqueta: 'Contactos recibidos',
+      etiqueta: 'Consultas recibidas',
       nuevos: datos.contactos.filter((item) => esReciente(item.creadoEn)).length,
     },
   ]
@@ -461,7 +461,7 @@ function TablaPublicaciones({
       {error && <Alerta>{error}</Alerta>}
 
       <Tabla
-        titulos={['Fecha', 'Publicación', 'Empresa', 'Estado', 'Contactos', 'Acciones']}
+        titulos={['Fecha', 'Publicación', 'Empresa', 'Estado', 'Consultas', 'Acciones']}
         vacio={publicaciones.length === 0}
       >
         {publicaciones.map((publicacion) => (
@@ -557,6 +557,9 @@ function TablaPublicaciones({
   )
 }
 
+const VISITANTE = 'Visitante sin cuenta'
+
+/** Consultas: quién se interesó en qué publicación, de quién era y por qué medio. */
 function TablaContactos({ datos, busqueda }: { datos: DatosAdmin; busqueda: string }) {
   const contactos = useMemo(() => {
     const termino = normalizar(busqueda)
@@ -565,32 +568,68 @@ function TablaContactos({ datos, busqueda }: { datos: DatosAdmin; busqueda: stri
       .filter(
         (contacto) =>
           !termino ||
-          normalizar(`${contacto.titulo} ${contacto.empresa} ${contacto.contacto}`).includes(termino),
+          normalizar(
+            `${contacto.titulo} ${contacto.publicadoPor} ${contacto.consultadoPor} ${contacto.persona} ${contacto.medio}`,
+          ).includes(termino),
       )
   }, [datos.contactos, busqueda])
 
   return (
-    <Tabla titulos={['Fecha', 'Hora', 'Publicación', 'Quién consultó']} vacio={contactos.length === 0}>
-      {contactos.map((contacto, indice) => (
-        <tr key={`${contacto.creadoEn}-${indice}`}>
-          <td className="px-4 py-3 whitespace-nowrap text-humo-600">{contacto.fecha}</td>
-          <td className="px-4 py-3 whitespace-nowrap text-humo-600">{contacto.hora}</td>
-          <td className="px-4 py-3 font-semibold text-humo-800">{contacto.titulo}</td>
-          <td className="px-4 py-3 text-humo-700">
-            {contacto.empresa ? (
-              <>
-                {contacto.empresa}
-                <span className="block text-xs text-humo-500">
-                  {contacto.contacto} · {contacto.tipo}
-                </span>
-              </>
-            ) : (
-              <span className="text-humo-500">Visitante sin cuenta</span>
-            )}
-          </td>
-        </tr>
-      ))}
-    </Tabla>
+    <>
+      <p className="mt-4 rounded-xl bg-humo-50 px-4 py-3 text-sm text-humo-600">
+        Cada fila es una <strong>consulta</strong>: alguien tocó WhatsApp o Llamar en una publicación
+        para contactar a quien la publicó. Sirve para ver qué materiales generan interés y para
+        hacer seguimiento de los contactos.
+      </p>
+
+      <Tabla
+        titulos={['Fecha', 'Material consultado', 'Publicado por', 'Consultado por', 'Cómo ubicarlo', 'Medio']}
+        vacio={contactos.length === 0}
+      >
+        {contactos.map((contacto, indice) => (
+          <tr key={`${contacto.creadoEn}-${indice}`} className="align-top">
+            <td className="px-4 py-3 whitespace-nowrap text-humo-600">
+              {contacto.fecha}
+              <span className="block text-xs text-humo-400">{contacto.hora}</span>
+            </td>
+            <td className="px-4 py-3 font-semibold text-humo-800">{contacto.titulo}</td>
+            <td className="px-4 py-3 text-humo-700">{contacto.publicadoPor || '—'}</td>
+            <td className="px-4 py-3 text-humo-700">
+              {contacto.consultadoPor && contacto.consultadoPor !== VISITANTE ? (
+                <>
+                  {contacto.consultadoPor}
+                  <span className="block text-xs text-humo-500">
+                    {contacto.persona}
+                    {contacto.tipo && ` · ${contacto.tipo}`}
+                  </span>
+                </>
+              ) : (
+                <span className="text-humo-500">{VISITANTE}</span>
+              )}
+            </td>
+            <td className="px-4 py-3 text-xs">
+              {contacto.telefono && (
+                <a
+                  href={enlaceWhatsAppDirecto(contacto.telefono)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block font-semibold text-marca-700 hover:underline"
+                >
+                  {contacto.telefono}
+                </a>
+              )}
+              {contacto.correo && (
+                <a href={`mailto:${contacto.correo}`} className="block break-all text-marca-700 hover:underline">
+                  {contacto.correo}
+                </a>
+              )}
+              {!contacto.telefono && !contacto.correo && <span className="text-humo-400">—</span>}
+            </td>
+            <td className="px-4 py-3 whitespace-nowrap text-humo-600">{contacto.medio || '—'}</td>
+          </tr>
+        ))}
+      </Tabla>
+    </>
   )
 }
 
@@ -637,7 +676,7 @@ function exportar(datos: DatosAdmin, seccion: Seccion): void {
 
   if (seccion === 'publicaciones') {
     descargarCsv(`ecoconecta-publicaciones-${hoy}.csv`, [
-      ['Fecha', 'Hora', 'Título', 'Material', 'Cantidad', 'Zona', 'Empresa', 'Contacto', 'Teléfono', 'Estado', 'Contactos'],
+      ['Fecha', 'Hora', 'Título', 'Material', 'Cantidad', 'Zona', 'Empresa', 'Contacto', 'Teléfono', 'Estado', 'Consultas'],
       ...datos.publicaciones.map((p) => [
         p.fecha, p.hora, p.titulo, buscarMaterial(p.materialId)?.material.nombre ?? p.materialId,
         formatearCantidad(p.cantidad, p.unidad), p.zona, p.empresa, p.contacto, p.telefono, p.estado, p.contactos,
@@ -647,9 +686,11 @@ function exportar(datos: DatosAdmin, seccion: Seccion): void {
   }
 
   if (seccion === 'contactos') {
-    descargarCsv(`ecoconecta-contactos-${hoy}.csv`, [
-      ['Fecha', 'Hora', 'Publicación', 'Quién consultó', 'Contacto', 'Tipo'],
-      ...datos.contactos.map((c) => [c.fecha, c.hora, c.titulo, c.empresa || 'Visitante sin cuenta', c.contacto, c.tipo]),
+    descargarCsv(`ecoconecta-consultas-${hoy}.csv`, [
+      ['Fecha', 'Hora', 'Material consultado', 'Publicado por', 'Consultado por', 'Persona', 'Teléfono', 'Correo', 'Tipo', 'Medio'],
+      ...datos.contactos.map((c) => [
+        c.fecha, c.hora, c.titulo, c.publicadoPor, c.consultadoPor || VISITANTE, c.persona, c.telefono, c.correo, c.tipo, c.medio,
+      ]),
     ])
     return
   }

@@ -43,16 +43,24 @@ export interface PublicacionAdmin {
   hora: string
 }
 
+/** Una fila de la pestaña Consultas: alguien tocó WhatsApp o Llamar en una publicación. */
 export interface ContactoAdmin {
   fecha: string
   hora: string
   creadoEn: string
+  /** Material consultado. */
   titulo: string
   publicacionId: string
-  /** Quién consultó (vacío si fue un visitante sin cuenta). */
-  empresa: string
-  contacto: string
+  /** Negocio dueño de la publicación. */
+  publicadoPor: string
+  /** Negocio que consultó, o "Visitante sin cuenta". */
+  consultadoPor: string
+  persona: string
+  telefono: string
+  correo: string
   tipo: string
+  /** "WhatsApp", "Llamada" o "No registrado". */
+  medio: string
 }
 
 export interface DatosAdmin {

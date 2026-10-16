@@ -45,12 +45,18 @@ export interface UsuarioAlmacenado extends Usuario {
 }
 
 /** Quién consultó por una publicación propia (solo personas con cuenta). */
+/** Por dónde se contactó: el botón que se tocó en la ventana de contacto. */
+export type MedioContacto = 'whatsapp' | 'llamada'
+
+/** Una consulta recibida: alguien con cuenta tomó el WhatsApp o el teléfono de la publicación. */
 export interface ContactoRecibido {
   publicacionId: string
   fecha: string
   empresa: string
   contacto: string
   tipo: TipoUsuario | ''
+  /** "WhatsApp", "Llamada" o "No registrado" (consultas anteriores al 17/10). */
+  medio?: string
 }
 
 export interface Publicacion {

@@ -21,7 +21,9 @@
  * Hojas que usa (se crean solas, y si les faltan columnas se agregan al final):
  *
  *   Empresas, Recolectores, Ambos   cuentas, separadas por tipo de usuario
- *   Publicaciones, Contactos
+ *   Publicaciones
+ *   Consultas   cada vez que alguien tomó el WhatsApp o el teléfono de una
+ *               publicación para contactar a quien la publicó
  *   Sesiones, Guardados, Recuperaciones   (técnicas: quedan ocultas)
  *
  * INSTALACIÓN: ver README.md, sección "Conectar con Google Sheets". Al pasar de
@@ -30,6 +32,8 @@
 
 var ZONA_HORARIA = 'America/La_Paz'
 var HOJA_PUBLICACIONES = 'Publicaciones'
+var HOJA_CONSULTAS = 'Consultas'
+/** Nombre que tenía la pestaña de consultas hasta el 16/10; actualizarHojas la convierte. */
 var HOJA_CONTACTOS = 'Contactos'
 var HOJA_SESIONES = 'Sesiones'
 var HOJA_GUARDADOS = 'Guardados'
@@ -96,8 +100,33 @@ var COLUMNAS_PUBLICACIONES = [
   'origen',
 ]
 
-/** usuarioId vacío = contacto de un visitante sin cuenta. empresa/contacto/tipo: quién consultó. */
-var COLUMNAS_CONTACTOS = ['fecha', 'hora', 'titulo', 'publicacionId', 'usuarioId', 'empresa', 'contacto', 'tipo']
+/**
+ * Una fila por cada vez que alguien tomó el WhatsApp o el teléfono de una
+ * publicación. Sirve para medir el interés por cada material y para que quien
+ * publicó sepa quién lo consultó. usuarioId vacío = visitante sin cuenta.
+ */
+var COLUMNAS_CONSULTAS = [
+  'fecha',
+  'hora',
+  'publicacion',
+  'publicadoPor',
+  'consultadoPor',
+  'persona',
+  'telefonoConsulta',
+  'correoConsulta',
+  'tipoConsulta',
+  'medio',
+  'publicacionId',
+  'usuarioId',
+]
+
+/** Columnas de "Contactos" en la versión del 16/10, para convertirla. */
+var CONTACTOS_16_OCTUBRE = ['fecha', 'hora', 'titulo', 'publicacionId', 'usuarioId', 'empresa', 'contacto', 'tipo']
+
+var VISITANTE = 'Visitante sin cuenta'
+
+/** Cómo contactó: lo manda la web según el botón que se tocó. */
+var MEDIOS = { whatsapp: 'WhatsApp', llamada: 'Llamada' }
 
 /** expiraEn en milisegundos: un número evita que Sheets lo convierta en fecha. */
 var COLUMNAS_SESIONES = ['token', 'usuarioId', 'creadaEn', 'expiraEn']
@@ -143,12 +172,35 @@ var TITULOS = {
   valorEstimadoMin: 'Valor estimado mín. (Bs)',
   valorEstimadoMax: 'Valor estimado máx. (Bs)',
   fechaDisponible: 'Disponible desde',
-  contactos: 'Contactos recibidos',
+  contactos: 'Consultas recibidas',
   categoriaId: 'Categoría',
   materialId: 'Material',
   usuarioId: 'ID usuario',
   origen: 'Origen',
   publicacionId: 'ID publicación',
+  publicacion: 'Material consultado',
+  publicadoPor: 'Publicado por',
+  consultadoPor: 'Consultado por',
+  persona: 'Persona que consultó',
+  telefonoConsulta: 'Teléfono de quien consultó',
+  correoConsulta: 'Correo de quien consultó',
+  tipoConsulta: 'Tipo de cuenta de quien consultó',
+  medio: 'Medio',
+}
+
+/** Títulos que tuvieron antes algunas columnas: se reconocen y actualizarHojas los renombra. */
+var TITULOS_ANTERIORES = { contactos: 'Contactos recibidos' }
+
+/** Explicación que aparece al pasar el mouse por el título de la columna. */
+var NOTAS = {
+  publicacion:
+    'Cada fila es una consulta: alguien tocó WhatsApp o Llamar en esta publicación para contactar a quien la publicó.',
+  publicadoPor: 'Negocio dueño de la publicación (el que recibe la consulta).',
+  consultadoPor: 'Negocio que consultó. "Visitante sin cuenta" si no había iniciado sesión.',
+  persona: 'Nombre de contacto de la cuenta que consultó.',
+  telefonoConsulta: 'Para hacer seguimiento: el teléfono de quien consultó.',
+  correoConsulta: 'Para hacer seguimiento: el correo de quien consultó.',
+  medio: 'Botón que tocó: WhatsApp o Llamada. "No registrado" en las consultas anteriores al 17/10.',
 }
 
 /** Formato de cada columna. Teléfonos y textos como texto: así no pierden ceros. */
@@ -156,6 +208,7 @@ var FORMATOS = {
   fecha: 'dd/mm/yyyy',
   hora: 'HH:mm',
   telefono: '@',
+  telefonoConsulta: '@',
   fechaDisponible: '@',
 }
 
@@ -194,6 +247,7 @@ function prepararColumnas(hoja, columnas, desde) {
   var filas = Math.max(hoja.getMaxRows() - 1, 1)
   columnas.forEach(function (columna, posicion) {
     var numero = desde + posicion
+    if (NOTAS[columna]) hoja.getRange(1, numero).setNote(NOTAS[columna])
     if (FORMATOS[columna]) hoja.getRange(2, numero, filas, 1).setNumberFormat(FORMATOS[columna])
     if (COLUMNAS_OCULTAS.indexOf(columna) !== -1) hoja.hideColumns(numero)
   })
@@ -225,7 +279,11 @@ function obtenerHoja(nombre, columnas) {
   var ancho = Math.max(hoja.getLastColumn(), 1)
   var encabezado = hoja.getRange(1, 1, 1, ancho).getValues()[0].map(String)
   var faltantes = columnas.filter(function (columna) {
-    return encabezado.indexOf(titulo(columna)) === -1 && encabezado.indexOf(columna) === -1
+    return (
+      encabezado.indexOf(titulo(columna)) === -1 &&
+      encabezado.indexOf(columna) === -1 &&
+      encabezado.indexOf(TITULOS_ANTERIORES[columna]) === -1
+    )
   })
 
   if (faltantes.length > 0) {
@@ -730,7 +788,8 @@ function respaldar(hoja, nombre) {
  *   - Hora de Bolivia para toda la hoja.
  *   - "Usuarios" se reparte en Empresas, Recolectores y Ambos, con sus
  *     contraseñas: nadie tiene que crear una nueva.
- *   - Publicaciones y Contactos ganan Fecha y Hora legibles.
+ *   - Publicaciones gana Fecha y Hora legibles.
+ *   - "Contactos" pasa a "Consultas", con columnas que se explican solas.
  *   - Las pestañas viejas NO se borran: quedan ocultas con "(respaldo)".
  *   - Las pestañas técnicas (Sesiones, Guardados, Recuperaciones) se ocultan.
  *
@@ -800,45 +859,90 @@ function actualizarHojas() {
     resumen.push('Publicaciones con fecha y hora: ' + filasPublicaciones.length)
   }
 
-  // 3. Contactos del formato anterior (la columna A se llamaba "publicacionId").
+  // 3. Consultas: antes la pestaña se llamaba "Contactos" (formato del 11/10 o del 16/10).
   var contactos = libro.getSheetByName(HOJA_CONTACTOS)
-  if (contactos && String(contactos.getRange(1, 1).getValue()) === 'publicacionId') {
-    var filasContactos = leerFilas(contactos, ANTERIOR_CONTACTOS)
+  if (contactos) {
+    var delOnce = String(contactos.getRange(1, 1).getValue()) === 'publicacionId'
+    var filasContactos = leerFilas(contactos, delOnce ? ANTERIOR_CONTACTOS : CONTACTOS_16_OCTUBRE)
     respaldar(contactos, 'Contactos (respaldo)')
-    var nuevosContactos = obtenerHoja(HOJA_CONTACTOS, COLUMNAS_CONTACTOS)
-    var titulos = {}
+
+    var consultas = obtenerHoja(HOJA_CONSULTAS, COLUMNAS_CONSULTAS)
+    var vistas = {}
+    leerFilas(consultas, COLUMNAS_CONSULTAS).forEach(function (fila) {
+      vistas[claveConsulta(fila.publicacionId, fila.usuarioId, fila.fecha)] = true
+    })
+
+    var publicacionesPorId = {}
     leerFilas(obtenerHoja(HOJA_PUBLICACIONES, COLUMNAS_PUBLICACIONES), COLUMNAS_PUBLICACIONES).forEach(
       function (publicacion) {
-        titulos[String(publicacion.id)] = String(publicacion.titulo)
+        publicacionesPorId[String(publicacion.id)] = publicacion
       },
     )
-
-    filasContactos.forEach(function (fila) {
-      var fecha = fechaDesde(fila.fecha)
-      fila.fecha = fecha
-      fila.hora = fecha
-      fila.titulo = titulos[String(fila.publicacionId)] || '(publicación eliminada o de ejemplo)'
-      nuevosContactos.appendRow(filaDesdeObjeto(fila, COLUMNAS_CONTACTOS))
+    var cuentasPorId = {}
+    leerCuentas().forEach(function (cuenta) {
+      cuentasPorId[String(cuenta.id)] = cuenta
     })
-    resumen.push('Contactos con fecha y hora: ' + filasContactos.length)
+
+    var convertidas = 0
+    filasContactos.forEach(function (fila) {
+      var clave = claveConsulta(fila.publicacionId, fila.usuarioId, fila.fecha)
+      if (vistas[clave]) return
+      vistas[clave] = true
+
+      var fecha = fechaDesde(fila.fecha)
+      var publicacion = publicacionesPorId[String(fila.publicacionId)]
+      var cuenta = cuentasPorId[String(fila.usuarioId)]
+      var conCuenta = String(fila.usuarioId || '') !== ''
+
+      consultas.appendRow(
+        filaDesdeObjeto(
+          {
+            fecha: fecha,
+            hora: fecha,
+            publicacion: publicacion ? String(publicacion.titulo) : String(fila.titulo || '(publicación eliminada)'),
+            publicadoPor: publicacion ? String(publicacion.empresa) : '',
+            consultadoPor: conCuenta ? String(fila.empresa) : VISITANTE,
+            persona: conCuenta ? String(fila.contacto) : '',
+            telefonoConsulta: cuenta ? normalizarTelefono(cuenta.telefono) : '',
+            correoConsulta: cuenta ? String(cuenta.correo) : '',
+            tipoConsulta: conCuenta ? String(fila.tipo) : '',
+            medio: 'No registrado',
+            publicacionId: String(fila.publicacionId),
+            usuarioId: conCuenta ? String(fila.usuarioId) : '',
+          },
+          COLUMNAS_CONSULTAS,
+        ),
+      )
+      convertidas++
+    })
+    resumen.push('Consultas (antes "Contactos"): ' + convertidas)
   }
 
-  // 4. Pestañas que falten, técnicas ocultas y orden de lectura.
+  // 4. Títulos que cambiaron de nombre (por ejemplo "Contactos recibidos").
+  var hojaPublicacionesActual = obtenerHoja(HOJA_PUBLICACIONES, COLUMNAS_PUBLICACIONES)
+  Object.keys(TITULOS_ANTERIORES).forEach(function (columna) {
+    var numero = COLUMNAS_PUBLICACIONES.indexOf(columna) + 1
+    if (numero < 1) return
+    var celda = hojaPublicacionesActual.getRange(1, numero)
+    if (String(celda.getValue()) === TITULOS_ANTERIORES[columna]) celda.setValue(titulo(columna))
+  })
+
+  // 5. Pestañas que falten, técnicas ocultas y orden de lectura.
   Object.keys(HOJA_POR_TIPO).forEach(hojaDeTipo)
   obtenerHoja(HOJA_PUBLICACIONES, COLUMNAS_PUBLICACIONES)
-  obtenerHoja(HOJA_CONTACTOS, COLUMNAS_CONTACTOS)
+  obtenerHoja(HOJA_CONSULTAS, COLUMNAS_CONSULTAS)
   obtenerHoja(HOJA_SESIONES, COLUMNAS_SESIONES).hideSheet()
   obtenerHoja(HOJA_GUARDADOS, COLUMNAS_GUARDADOS).hideSheet()
   obtenerHoja(HOJA_RECUPERACIONES, COLUMNAS_RECUPERACIONES).hideSheet()
 
-  var orden = ['Empresas', 'Recolectores', 'Ambos', HOJA_PUBLICACIONES, HOJA_CONTACTOS]
+  var orden = ['Empresas', 'Recolectores', 'Ambos', HOJA_PUBLICACIONES, HOJA_CONSULTAS]
   orden.forEach(function (nombre, posicion) {
     libro.setActiveSheet(libro.getSheetByName(nombre))
     libro.moveActiveSheet(posicion + 1)
   })
   libro.setActiveSheet(libro.getSheetByName('Empresas'))
 
-  // 5. Lo que necesita el script para funcionar.
+  // 6. Lo que necesita el script para funcionar.
   resumen.push('Correos disponibles hoy: ' + MailApp.getRemainingDailyQuota())
   resumen.push(
     PropertiesService.getScriptProperties().getProperty(PROPIEDAD_CLAVE_ADMIN)
@@ -987,42 +1091,55 @@ function eliminarPublicacion(usuarioId, datos) {
   return respuesta({ ok: true })
 }
 
-// ================================================================ contactos
+// ================================================================ consultas
+
+/** Identifica una consulta para no repetirla al convertir hojas viejas. */
+function claveConsulta(publicacionId, usuarioId, fecha) {
+  return [String(publicacionId), String(usuarioId || ''), fechaDesde(fecha).getTime()].join('|')
+}
 
 /**
- * Registra una consulta. Con sesión, cada cuenta suma una sola vez por
- * publicación y el oferente puede ver quién fue. Sin sesión se cuenta igual.
+ * Registra una consulta: alguien tocó WhatsApp o Llamar en una publicación.
+ * Con sesión, cada cuenta suma una sola vez por publicación y quien publicó
+ * puede ver quién fue. Sin sesión se cuenta igual, como visitante.
  */
 function registrarContacto(usuarioId, datos) {
   var hojaPublicaciones = obtenerHoja(HOJA_PUBLICACIONES, COLUMNAS_PUBLICACIONES)
   var publicacion = buscar(leerFilas(hojaPublicaciones, COLUMNAS_PUBLICACIONES), 'id', datos.id)
   if (!publicacion) return respuesta({ ok: true, nuevo: false })
 
-  var hojaContactos = obtenerHoja(HOJA_CONTACTOS, COLUMNAS_CONTACTOS)
+  var hoja = obtenerHoja(HOJA_CONSULTAS, COLUMNAS_CONSULTAS)
   var ahora = new Date()
-  var contacto = {
+  var consulta = {
     fecha: ahora,
     hora: ahora,
-    titulo: String(publicacion.titulo),
+    publicacion: String(publicacion.titulo),
+    publicadoPor: String(publicacion.empresa),
+    consultadoPor: VISITANTE,
+    medio: MEDIOS[datos.medio] || 'No registrado',
     publicacionId: String(publicacion.id),
   }
 
   if (usuarioId) {
     if (String(publicacion.usuarioId) === usuarioId) return respuesta({ ok: true, nuevo: false })
 
-    var repetido = leerFilas(hojaContactos, COLUMNAS_CONTACTOS).some(function (fila) {
-      return String(fila.publicacionId) === contacto.publicacionId && String(fila.usuarioId) === usuarioId
+    var repetido = leerFilas(hoja, COLUMNAS_CONSULTAS).some(function (fila) {
+      return String(fila.publicacionId) === consulta.publicacionId && String(fila.usuarioId) === usuarioId
     })
     if (repetido) return respuesta({ ok: true, nuevo: false })
 
     var usuario = buscarUsuario(usuarioId)
-    contacto.usuarioId = usuarioId
-    contacto.empresa = usuario ? usuario.empresa : ''
-    contacto.contacto = usuario ? usuario.contacto : ''
-    contacto.tipo = usuario ? usuario.tipo : ''
+    consulta.usuarioId = usuarioId
+    if (usuario) {
+      consulta.consultadoPor = String(usuario.empresa)
+      consulta.persona = String(usuario.contacto)
+      consulta.telefonoConsulta = normalizarTelefono(usuario.telefono)
+      consulta.correoConsulta = String(usuario.correo)
+      consulta.tipoConsulta = String(usuario.tipo)
+    }
   }
 
-  hojaContactos.appendRow(filaDesdeObjeto(contacto, COLUMNAS_CONTACTOS))
+  hoja.appendRow(filaDesdeObjeto(consulta, COLUMNAS_CONSULTAS))
 
   var columna = COLUMNAS_PUBLICACIONES.indexOf('contactos') + 1
   hojaPublicaciones
@@ -1041,7 +1158,7 @@ function contactosRecibidos(usuarioId) {
     },
   )
 
-  var contactos = leerFilas(obtenerHoja(HOJA_CONTACTOS, COLUMNAS_CONTACTOS), COLUMNAS_CONTACTOS)
+  var contactos = leerFilas(obtenerHoja(HOJA_CONSULTAS, COLUMNAS_CONSULTAS), COLUMNAS_CONSULTAS)
     .filter(function (fila) {
       return propias[String(fila.publicacionId)] && String(fila.usuarioId) !== ''
     })
@@ -1049,9 +1166,10 @@ function contactosRecibidos(usuarioId) {
       return {
         publicacionId: String(fila.publicacionId),
         fecha: formatearMarcaTemporal(fila.fecha),
-        empresa: String(fila.empresa),
-        contacto: String(fila.contacto),
-        tipo: String(fila.tipo),
+        empresa: String(fila.consultadoPor),
+        contacto: String(fila.persona),
+        tipo: String(fila.tipoConsulta),
+        medio: String(fila.medio),
       }
     })
     .reverse()
@@ -1090,7 +1208,7 @@ function miActividad(usuarioId) {
     })
     .reverse()
 
-  var contactos = leerFilas(obtenerHoja(HOJA_CONTACTOS, COLUMNAS_CONTACTOS), COLUMNAS_CONTACTOS)
+  var contactos = leerFilas(obtenerHoja(HOJA_CONSULTAS, COLUMNAS_CONSULTAS), COLUMNAS_CONSULTAS)
     .filter(function (fila) {
       return String(fila.usuarioId) === usuarioId
     })
@@ -1278,17 +1396,21 @@ function datosAdmin(datos, token) {
     },
   )
 
-  var contactos = leerFilas(obtenerHoja(HOJA_CONTACTOS, COLUMNAS_CONTACTOS), COLUMNAS_CONTACTOS).map(
+  var contactos = leerFilas(obtenerHoja(HOJA_CONSULTAS, COLUMNAS_CONSULTAS), COLUMNAS_CONSULTAS).map(
     function (fila) {
       return {
         fecha: fechaLegible(fila.fecha),
         hora: horaLegible(fila.hora),
         creadoEn: formatearMarcaTemporal(fila.fecha),
-        titulo: String(fila.titulo),
+        titulo: String(fila.publicacion),
         publicacionId: String(fila.publicacionId),
-        empresa: String(fila.empresa),
-        contacto: String(fila.contacto),
-        tipo: String(fila.tipo),
+        publicadoPor: String(fila.publicadoPor),
+        consultadoPor: String(fila.consultadoPor),
+        persona: String(fila.persona),
+        telefono: normalizarTelefono(fila.telefonoConsulta),
+        correo: String(fila.correoConsulta),
+        tipo: String(fila.tipoConsulta),
+        medio: String(fila.medio),
       }
     },
   )
@@ -1378,7 +1500,7 @@ function doGet(e) {
     var accion = (e && e.parameter && e.parameter.accion) || 'listar_publicaciones'
 
     if (accion === 'listar_publicaciones') return listarPublicaciones()
-    if (accion === 'estado') return respuesta({ ok: true, version: 4 })
+    if (accion === 'estado') return respuesta({ ok: true, version: 5 })
 
     return rechazo('accion_desconocida', 'Acción no reconocida: ' + accion)
   } catch (error) {
