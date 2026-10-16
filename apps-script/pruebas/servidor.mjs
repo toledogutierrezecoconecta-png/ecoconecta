@@ -9,7 +9,7 @@ const PUERTO = Number(process.argv[3] ?? 8787)
 
 /** Hoja simulada ya convertida con actualizarHojas, como queda la real al instalar. */
 function nuevaHoja() {
-  const script = cargarScript(CODIGO, libroComoElReal(), { CLAVE_ADMIN: 'admin-local' })
+  const script = cargarScript(CODIGO, libroComoElReal(), { CLAVE_ADMIN: 'admin-local', CORREOS_ADMIN: 'imprenta@ejemplo.test' })
   script.ejecutar('actualizarHojas')
   return script
 }

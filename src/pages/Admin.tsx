@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Boton, clasesBoton } from '../components/ui/Boton'
 import { CampoTexto } from '../components/ui/Campo'
 import { EtiquetaEstado } from '../components/ui/Etiqueta'
@@ -8,6 +8,7 @@ import { Icono } from '../components/ui/Icono'
 import type { NombreIcono } from '../components/ui/Icono'
 import { Modal } from '../components/ui/Modal'
 import { buscarMaterial } from '../data/catalogos'
+import { useAuth } from '../hooks/useAuth'
 import {
   ErrorAdmin,
   cambiarEstadoAdmin,
@@ -46,13 +47,16 @@ function enlaceWhatsAppDirecto(telefono: string): string {
 /**
  * Panel de administración.
  *
- * No aparece en el menú: se entra por /#/admin y pide la clave de
- * administrador, que valida el servidor. Muestra lo mismo que la hoja de
+ * Entran las cuentas cuyo correo está en CORREOS_ADMIN (con su sesión
+ * normal; para ellas aparece "Admin" en el menú) o, como respaldo, quien
+ * escriba /#/admin y conozca la clave de administrador. Todo lo valida el servidor. Muestra lo mismo que la hoja de
  * Google, con buscador, filtros y acciones, sin salir de la web.
  */
 export function Admin() {
+  const { usuario } = useAuth()
+  const navegar = useNavigate()
   const [datos, setDatos] = useState<DatosAdmin | null>(null)
-  const [cargando, setCargando] = useState(Boolean(leerClaveAdmin()))
+  const [cargando, setCargando] = useState(Boolean(leerClaveAdmin() || usuario))
   const [error, setError] = useState('')
   const [seccion, setSeccion] = useState<Seccion>('resumen')
   const [busqueda, setBusqueda] = useState('')
@@ -63,30 +67,43 @@ export function Admin() {
     try {
       setDatos(await obtenerDatosAdmin(clave))
     } catch (problema) {
+      const codigo = problema instanceof ErrorAdmin ? problema.codigo : ''
       // Clave incorrecta: se olvida para volver a pedirla.
-      if (problema instanceof ErrorAdmin && problema.codigo === 'clave_admin') {
+      if (codigo === 'clave_admin') {
         salirAdmin()
         setDatos(null)
       }
+      // Se intentó entrar solo con la sesión: si no alcanza, se pide la clave sin mostrar error.
+      const intentoConSesion = clave === undefined && !leerClaveAdmin()
+      if (intentoConSesion && (codigo === 'no_admin' || codigo === 'clave_admin')) return
       setError(problema instanceof Error ? problema.message : 'No se pudieron cargar los datos.')
     } finally {
       setCargando(false)
     }
   }, [])
 
-  // Si la clave ya se ingresó en esta sesión del navegador, se entra directo.
+  // Se entra directo con la clave ya ingresada o con la sesión de una cuenta administradora.
   useEffect(() => {
-    if (leerClaveAdmin()) void cargar()
-  }, [cargar])
+    if (leerClaveAdmin() || usuario) void cargar()
+  }, [cargar, usuario])
 
   if (!datos) {
-    return <IngresoAdmin cargando={cargando} error={error} onIngresar={(clave) => void cargar(clave)} />
+    return (
+      <IngresoAdmin
+        cargando={cargando}
+        error={error}
+        conSesion={Boolean(usuario)}
+        onIngresar={(clave) => void cargar(clave)}
+      />
+    )
   }
 
   const salir = () => {
     salirAdmin()
-    setDatos(null)
     setError('')
+    // Con una cuenta administradora, "Salir" vuelve al inicio (la sesión sigue abierta).
+    if (usuario?.esAdmin) navegar('/')
+    else setDatos(null)
   }
 
   return (
@@ -194,10 +211,13 @@ export function Admin() {
 function IngresoAdmin({
   cargando,
   error,
+  conSesion,
   onIngresar,
 }: {
   cargando: boolean
   error: string
+  /** Hay una sesión abierta, pero de una cuenta que no es administradora. */
+  conSesion: boolean
   onIngresar: (clave: string) => void
 }) {
   const [clave, setClave] = useState('')
@@ -234,6 +254,18 @@ function IngresoAdmin({
         <Boton type="submit" tamano="lg" anchoCompleto disabled={cargando}>
           {cargando ? 'Verificando…' : 'Entrar'}
         </Boton>
+
+        {conSesion ? (
+          <p className="text-center text-xs text-humo-500">
+            Tu cuenta no es de administrador. Para entrar con tu cuenta, su correo tiene que estar en
+            CORREOS_ADMIN.
+          </p>
+        ) : (
+          <Link to="/acceso?volver=%2Fadmin" className={clasesBoton('contorno', 'md', true)}>
+            <Icono nombre="usuario" className="h-4 w-4" />
+            Ingresar con mi cuenta de administrador
+          </Link>
+        )}
 
         <Link to="/" className={clasesBoton('fantasma', 'sm', true)}>
           Volver al inicio

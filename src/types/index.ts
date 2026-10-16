@@ -29,6 +29,8 @@ export interface Usuario {
   creadoEn: string
   /** Distrito donde trabaja el recolector; filtra las novedades de su panel. */
   zonaInteres?: string
+  /** Lo decide el Apps Script (propiedad CORREOS_ADMIN): habilita el panel de administración. */
+  esAdmin?: boolean
 }
 
 /** Datos del perfil que el usuario puede cambiar desde "Mi perfil". */

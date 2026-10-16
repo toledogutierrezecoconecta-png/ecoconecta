@@ -76,7 +76,7 @@ export function Navbar() {
 
   const enlaces = [
     ...(usuario ? enlacesPrivados(usuario.tipo) : PUBLICOS),
-    ...(esAdmin ? [{ a: '/admin', texto: 'Admin' }] : []),
+    ...(esAdmin || usuario?.esAdmin ? [{ a: '/admin', texto: 'Admin' }] : []),
   ]
 
   // Primero se sale de la página: si se cierra la sesión estando en una

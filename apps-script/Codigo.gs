@@ -164,6 +164,12 @@ var COLUMNAS_OCULTAS = ['hashClave', 'sal']
 
 /** Clave del administrador: Configuración del proyecto → Propiedades de la secuencia de comandos. */
 var PROPIEDAD_CLAVE_ADMIN = 'CLAVE_ADMIN'
+
+/**
+ * Correos de las cuentas administradoras, separados por coma, en la misma
+ * sección de propiedades. Esas cuentas entran al panel con su sesión normal.
+ */
+var PROPIEDAD_CORREOS_ADMIN = 'CORREOS_ADMIN'
 var INTENTOS_ADMIN = 8
 
 var MINUTOS_CODIGO = 15
@@ -355,6 +361,7 @@ function usuarioPublico(fila) {
   usuario.telefono = normalizarTelefono(usuario.telefono)
   usuario.creadoEn = formatearMarcaTemporal(usuario.creadoEn)
   usuario.correo = String(usuario.correo)
+  usuario.esAdmin = esCorreoAdmin(usuario.correo)
   return usuario
 }
 
@@ -838,6 +845,10 @@ function actualizarHojas() {
       ? 'Clave de administrador: configurada'
       : 'Clave de administrador: FALTA (agregá CLAVE_ADMIN en las propiedades del script)',
   )
+  resumen.push(
+    'Correos administradores: ' +
+      (PropertiesService.getScriptProperties().getProperty(PROPIEDAD_CORREOS_ADMIN) || 'ninguno (CORREOS_ADMIN)'),
+  )
 
   var texto = 'Listo.\n' + resumen.join('\n')
   Logger.log(texto)
@@ -1182,7 +1193,39 @@ function claveAdminValida(clave) {
   return 'ok'
 }
 
+/** ¿El correo está en la lista CORREOS_ADMIN? */
+function esCorreoAdmin(correo) {
+  var buscado = String(correo || '').trim().toLowerCase()
+  if (!buscado) return false
+
+  var lista = String(PropertiesService.getScriptProperties().getProperty(PROPIEDAD_CORREOS_ADMIN) || '')
+  return lista.split(/[\s,;]+/).some(function (admin) {
+    return admin.toLowerCase() === buscado
+  })
+}
+
+/**
+ * Permiso para el panel: la sesión de una cuenta administradora o, como
+ * respaldo, la clave CLAVE_ADMIN. Devuelve 'ok' o el motivo del rechazo.
+ */
+function accesoAdmin(datos, token) {
+  var usuarioId = validarSesion(token)
+  if (usuarioId) {
+    var cuenta = buscarCuenta('id', usuarioId)
+    if (cuenta && esCorreoAdmin(cuenta.correo)) return 'ok'
+  }
+
+  if (!datos.clave) return usuarioId ? 'no_admin' : 'sin_clave'
+  return claveAdminValida(datos.clave)
+}
+
 function rechazoAdmin(estado) {
+  if (estado === 'no_admin') {
+    return rechazo('no_admin', 'Esta cuenta no es de administrador. Ingresá con la clave de administrador.')
+  }
+  if (estado === 'sin_clave') {
+    return rechazo('clave_admin', 'Ingresá la clave de administrador.')
+  }
   if (estado === 'sin_configurar') {
     return rechazo('clave_admin', 'Falta configurar la clave de administrador (CLAVE_ADMIN) en el script.')
   }
@@ -1201,8 +1244,8 @@ function horaLegible(valor) {
 }
 
 /** Todo lo que muestra el panel de administrador. */
-function datosAdmin(datos) {
-  var estado = claveAdminValida(datos.clave)
+function datosAdmin(datos, token) {
+  var estado = accesoAdmin(datos, token)
   if (estado !== 'ok') return rechazoAdmin(estado)
 
   var usuarios = leerCuentas().map(function (fila) {
@@ -1261,8 +1304,8 @@ function datosAdmin(datos) {
 }
 
 /** Pausar, activar o eliminar cualquier publicación desde el panel. */
-function publicacionAdmin(datos) {
-  var estado = claveAdminValida(datos.clave)
+function publicacionAdmin(datos, token) {
+  var estado = accesoAdmin(datos, token)
   if (estado !== 'ok') return rechazoAdmin(estado)
 
   var hoja = obtenerHoja(HOJA_PUBLICACIONES, COLUMNAS_PUBLICACIONES)
@@ -1311,8 +1354,8 @@ function doPost(e) {
     if (accion === 'restablecer_clave') return restablecerClave(datos)
     if (accion === 'cerrar_sesion') return cerrarSesion(token)
     if (accion === 'registrar_contacto') return registrarContacto(validarSesion(token), datos)
-    if (accion === 'admin_datos') return datosAdmin(datos)
-    if (accion === 'admin_publicacion') return publicacionAdmin(datos)
+    if (accion === 'admin_datos') return datosAdmin(datos, token)
+    if (accion === 'admin_publicacion') return publicacionAdmin(datos, token)
 
     var manejador = ACCIONES_CON_SESION[accion]
     if (!manejador) return rechazo('accion_desconocida', 'Acción no reconocida: ' + accion)
@@ -1335,7 +1378,7 @@ function doGet(e) {
     var accion = (e && e.parameter && e.parameter.accion) || 'listar_publicaciones'
 
     if (accion === 'listar_publicaciones') return listarPublicaciones()
-    if (accion === 'estado') return respuesta({ ok: true, version: 3 })
+    if (accion === 'estado') return respuesta({ ok: true, version: 4 })
 
     return rechazo('accion_desconocida', 'Acción no reconocida: ' + accion)
   } catch (error) {

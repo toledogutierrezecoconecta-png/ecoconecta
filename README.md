@@ -186,10 +186,16 @@ confirmación** de la pestaña de la cuenta dice si salió (`Enviado`) o no. La 
 
 ### Panel de administrador
 
-Se entra escribiendo `…/ecoconecta/#/admin`: no tiene enlace público. Pide la **clave de
-administrador**, que se guarda en el script como propiedad `CLAVE_ADMIN` (Apps Script →
-Configuración del proyecto → Propiedades de la secuencia de comandos) y **nunca en el código de la
-web**. Tras 8 intentos fallidos se bloquea 15 minutos.
+Hay dos formas de entrar, y las dos las valida el script (nada de esto está en el código de la web):
+
+- **Con la cuenta de administrador (la habitual).** Los correos de las cuentas administradoras van
+  en la propiedad `CORREOS_ADMIN` (Apps Script → Configuración del proyecto → Propiedades de la
+  secuencia de comandos), separados por coma. Esa cuenta inicia sesión normalmente y le aparece
+  **Admin** en el menú. La cuenta tiene que estar registrada en la web, así que figura en su
+  pestaña (Empresas, Recolectores o Ambos).
+- **Con la clave, como respaldo.** Escribiendo `…/ecoconecta/#/admin` se pide la **clave de
+  administrador**, guardada en la propiedad `CLAVE_ADMIN`. Tras 8 intentos fallidos se bloquea 15
+  minutos. Desde esa misma pantalla se puede elegir "Ingresar con mi cuenta de administrador".
 
 Muestra un resumen con los registros de los últimos 7 días, las tablas de Empresas, Recolectores,
 Ambos, Publicaciones y Contactos con buscador, acceso directo por WhatsApp y correo, acciones para
@@ -327,8 +333,9 @@ npm run sheets:probar
 Para usar la web contra la hoja simulada, levantá el servidor local (queda en
 `http://localhost:8787/exec`, con `/__estado` para ver el contenido de cada pestaña,
 `/__correos` para ver los correos que "envió" y `/__reiniciar` para volver al estado inicial). La
-hoja simulada arranca ya convertida con `actualizarHojas` y con la clave de administrador
-`admin-local`. En desarrollo, la web se conecta a ella con
+hoja simulada arranca ya convertida con `actualizarHojas`, con la clave de administrador
+`admin-local` y con la cuenta de prueba `imprenta@ejemplo.test` (contraseña `imprenta1`) como
+administradora. En desarrollo, la web se conecta a ella con
 `localStorage.setItem('ecoconecta.sheetsUrl', 'http://localhost:8787/exec')`:
 
 ```bash

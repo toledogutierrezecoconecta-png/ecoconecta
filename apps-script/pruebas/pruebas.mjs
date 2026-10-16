@@ -411,6 +411,30 @@ if (CODIGO) {
     assert.equal(r.codigo, 'clave_admin')
     assert.match(r.error, /Demasiados intentos/)
   })
+  prueba('una cuenta de CORREOS_ADMIN entra al panel con su sesión, sin clave', () => {
+    s.propiedades.CORREOS_ADMIN = 'otra@ejemplo.test, IMPRENTA@ejemplo.test'
+    const sesion = s.post('iniciar_sesion', { correo: 'imprenta@ejemplo.test', clave: CLAVE_IMPRENTA })
+    assert.equal(sesion.usuario.esAdmin, true)
+    // Aunque la clave esté bloqueada por los intentos de la prueba anterior.
+    const r = s.post('admin_datos', {}, sesion.token)
+    assert.equal(r.ok, true, JSON.stringify(r))
+    assert.equal(s.post('admin_publicacion', { id: 'pub-a', estado: 'disponible' }, sesion.token).ok, true)
+  })
+  prueba('una cuenta común no entra al panel con su sesión', () => {
+    const sesion = s.post('iniciar_sesion', { correo: 'pollos@ejemplo.test', clave: 'pollos123' })
+    assert.equal(sesion.usuario.esAdmin, false)
+    assert.equal(s.post('admin_datos', {}, sesion.token).codigo, 'no_admin')
+  })
+  prueba('sin sesión ni clave se pide la clave', () => {
+    const r = s.post('admin_datos', {})
+    assert.equal(r.codigo, 'clave_admin')
+    assert.match(r.error, /Ingresá la clave/)
+  })
+  prueba('una sesión cerrada ya no da acceso al panel', () => {
+    const sesion = s.post('iniciar_sesion', { correo: 'imprenta@ejemplo.test', clave: CLAVE_IMPRENTA })
+    s.post('cerrar_sesion', {}, sesion.token)
+    assert.equal(s.post('admin_datos', {}, sesion.token).codigo, 'clave_admin')
+  })
   prueba('la lectura pública no expone fecha y hora internas', () => {
     const p = s.get().publicaciones[0]
     assert.equal(p.fecha, undefined)
@@ -418,7 +442,7 @@ if (CODIGO) {
     assert.match(p.creadaEn, /^\d{4}-\d{2}-\d{2}T/)
   })
   prueba('la versión del script se puede consultar', () => {
-    assert.equal(s.get('estado').version, 3)
+    assert.equal(s.get('estado').version, 4)
   })
 
   console.log(`\n${pasadas} pruebas pasaron${process.exitCode ? ', hay fallas' : ''}.`)
