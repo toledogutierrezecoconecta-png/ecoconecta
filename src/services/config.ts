@@ -25,6 +25,8 @@ export function obtenerUrlSheets(): string {
   try {
     const manual = localStorage.getItem('ecoconecta.sheetsUrl')
     if (manual && manual.startsWith('https://')) return manual
+    // Solo en desarrollo: permite usar la hoja simulada (npm run sheets:local).
+    if (import.meta.env.DEV && manual?.startsWith('http://localhost')) return manual
   } catch {
     /* localStorage bloqueado: se ignora y se usa la constante. */
   }

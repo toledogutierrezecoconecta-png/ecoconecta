@@ -77,12 +77,15 @@ npm run lint
 | Panel del recolector: novedades en su zona, guardadas y contactos | Completo |
 | Página "Cómo definimos los precios" con metodología y tabla vigente | Completo |
 | Sincronización con Google Sheets, con reintentos sin conexión | Completo |
+| Correo de confirmación al registrarse | Completo |
+| Cuentas separadas en las pestañas Empresas, Recolectores y Ambos | Completo |
+| Fecha y hora de Bolivia legibles en cada registro, publicación y contacto | Completo |
+| Panel de administrador en `/#/admin`, protegido con clave | Completo |
 | Vista previa al compartir el enlace (WhatsApp, Facebook, LinkedIn) | Completo |
 | Diseño responsive pensado para Android | Completo |
 
-El marketplace incluye **10 publicaciones de ejemplo** (9 disponibles y 1 concretada) para que tenga contenido. Se muestran con
-la etiqueta "Publicación de ejemplo", después de las reales y **sin opción de contacto**: sus
-teléfonos son inventados y podrían pertenecer a personas reales.
+El marketplace muestra solo publicaciones reales, leídas de la hoja. Las publicaciones de ejemplo
+de versiones anteriores se descartan también de los navegadores que las tenían guardadas.
 
 ---
 
@@ -154,15 +157,44 @@ del script está en [`apps-script/Codigo.gs`](apps-script/Codigo.gs) y su URL en
 
 | Pestaña | Qué guarda |
 | --- | --- |
-| **Usuarios** | Cuentas. La contraseña se guarda como hash SHA-256 con sal (columnas `hashClave` y `sal`), nunca en texto plano. |
+| **Empresas** | Cuentas de tipo oferente (negocios que generan residuos). |
+| **Recolectores** | Cuentas de tipo recolector / comprador. |
+| **Ambos** | Cuentas que ofrecen y buscan materiales. |
 | **Publicaciones** | Las ofertas del marketplace. Es la única pestaña de lectura pública. |
 | **Contactos** | Cada consulta: qué publicación, cuándo y, si tenía cuenta, quién. |
-| **Sesiones** | Llaves de sesión activas; vencen a los 60 días. |
-| **Guardados** | Qué publicaciones guardó cada usuario. |
-| **Recuperaciones** | Códigos para restablecer la contraseña (guardados como hash), con vencimiento e intentos. |
+| **Sesiones** *(oculta)* | Llaves de sesión activas; vencen a los 60 días. |
+| **Guardados** *(oculta)* | Qué publicaciones guardó cada usuario. |
+| **Recuperaciones** *(oculta)* | Códigos para restablecer la contraseña (guardados como hash), con vencimiento e intentos. |
 
-Las pestañas y columnas que falten se crean solas. Las columnas nuevas se agregan al final, así
-que las filas existentes no se tocan.
+- **Fecha y Hora** son las dos primeras columnas de Empresas, Recolectores, Ambos, Publicaciones
+  y Contactos, en hora de Bolivia (`America/La_Paz`). La hoja se configura en esa zona horaria.
+- En las pestañas de cuentas, la contraseña se guarda como hash SHA-256 con sal en las columnas
+  `hashClave` y `sal`, que quedan **ocultas**. Nunca en texto plano.
+- Si una cuenta cambia de tipo en su perfil, su fila se muda a la pestaña que corresponde.
+- El script lee **por posición**: se puede cambiar el título de una columna, pero no moverla.
+- Las pestañas y columnas que falten se crean solas. Las columnas nuevas se agregan al final, así
+  que las filas existentes no se tocan.
+- Las pestañas que terminan en **(respaldo)** son las de la versión anterior a la actualización.
+  Quedan ocultas y se pueden borrar una vez comprobado que todo funciona.
+
+### Correo de confirmación
+
+Al registrarse, el script envía un correo de bienvenida con el logo, los datos de la cuenta, la
+fecha de registro y los próximos pasos según el tipo de usuario. La columna **Correo de
+confirmación** de la pestaña de la cuenta dice si salió (`Enviado`) o no. La web muestra el aviso
+"Te enviamos un correo de confirmación a…" en la página a la que llega después de registrarse.
+
+### Panel de administrador
+
+Se entra escribiendo `…/ecoconecta/#/admin`: no tiene enlace público. Pide la **clave de
+administrador**, que se guarda en el script como propiedad `CLAVE_ADMIN` (Apps Script →
+Configuración del proyecto → Propiedades de la secuencia de comandos) y **nunca en el código de la
+web**. Tras 8 intentos fallidos se bloquea 15 minutos.
+
+Muestra un resumen con los registros de los últimos 7 días, las tablas de Empresas, Recolectores,
+Ambos, Publicaciones y Contactos con buscador, acceso directo por WhatsApp y correo, acciones para
+pausar, activar o eliminar publicaciones, descarga a Excel (CSV) y un botón para abrir la hoja. La
+clave se recuerda solo hasta cerrar el navegador.
 
 ### Cuentas y permisos
 
@@ -264,13 +296,27 @@ npm run sheets:publicar
 > Nunca crees una implementación nueva desde el editor de Apps Script: cambiaría la URL `/exec`
 > y el sitio dejaría de conectarse con la hoja.
 
+### Al pasar desde la versión del 11/10 (una sola vez)
+
+La versión con pestañas por tipo y fecha y hora cambia la forma de la hoja. Después de subir el
+código, en el editor de Apps Script elegí la función **`actualizarHojas`** y tocá **Ejecutar**:
+reparte `Usuarios` en Empresas, Recolectores y Ambos **conservando las contraseñas**, agrega Fecha
+y Hora, oculta las pestañas técnicas y deja las viejas como respaldo oculto. Se puede ejecutar más
+de una vez sin duplicar nada. Recién después se publica la versión nueva.
+
+**Sin clasp** (por ejemplo, desde otra computadora): copiá [`apps-script/Codigo.gs`](apps-script/Codigo.gs)
+en el editor de Apps Script, guardá, ejecutá `actualizarHojas` si corresponde y publicá con
+**Implementar → Gestionar implementaciones → ✏️ → Versión: Nueva versión → Implementar**, siempre
+sobre la implementación cuya URL termina en `...VCIJSQoy24Q/exec`.
+
 ### Probar el Apps Script sin tocar la hoja real
 
 [`apps-script/pruebas/`](apps-script/pruebas/) ejecuta el `Codigo.gs` real en Node sobre una
 imitación de Google Sheets, que reproduce sus conversiones automáticas (teléfonos que se vuelven
 números, fechas, el apóstrofo inicial) y guarda los correos en una lista en vez de enviarlos.
-Cubre registro, inicio de sesión, cuentas de la versión anterior, permisos, fórmulas, contactos,
-guardados, perfil, vencimiento de sesiones y recuperación de contraseña.
+Cubre la actualización de la hoja (`actualizarHojas`), registro y correo de confirmación, inicio
+de sesión, cuentas de la versión anterior, pestañas por tipo, permisos, fórmulas, contactos,
+guardados, perfil, vencimiento de sesiones, recuperación de contraseña y panel de administrador.
 
 ```bash
 npm run sheets:probar
@@ -280,7 +326,10 @@ npm run sheets:probar
 
 Para usar la web contra la hoja simulada, levantá el servidor local (queda en
 `http://localhost:8787/exec`, con `/__estado` para ver el contenido de cada pestaña,
-`/__correos` para ver los correos que "envió" y `/__reiniciar` para volver al estado inicial):
+`/__correos` para ver los correos que "envió" y `/__reiniciar` para volver al estado inicial). La
+hoja simulada arranca ya convertida con `actualizarHojas` y con la clave de administrador
+`admin-local`. En desarrollo, la web se conecta a ella con
+`localStorage.setItem('ecoconecta.sheetsUrl', 'http://localhost:8787/exec')`:
 
 ```bash
 npm run sheets:local
@@ -297,15 +346,14 @@ src/
 ├── assets/            Logo, ilustraciones de portada y fotos de materiales (WebP)
 ├── components/
 │   ├── layout/        Menú y pie de página
-│   ├── panel/         Panel del recolector
+│   ├── panel/         Panel del recolector y aviso de bienvenida
 │   ├── portada/       Botones superpuestos a la ilustración de portada
 │   ├── residuos/      Tarjeta, imagen y botón de guardar de una publicación
 │   └── ui/            Botón, campos, etiquetas, modal, iconos
 ├── data/
 │   ├── catalogos.ts   Categorías, materiales, zonas, unidades, frecuencias
 │   ├── imagenes.ts    Fotos de materiales y de portada
-│   ├── precios.ts     Tabla de precios de referencia por material
-│   └── seed.ts        Publicaciones de ejemplo
+│   └── precios.ts     Tabla de precios de referencia por material
 ├── hooks/
 │   ├── useActividad.ts      Guardadas y contactos del usuario
 │   ├── useAuth.tsx          Sesión del usuario
@@ -314,8 +362,10 @@ src/
 ├── pages/             Una por pantalla de la aplicación
 ├── services/
 │   ├── actividad.ts       Guardadas y contactos realizados
+│   ├── admin.ts           Datos y acciones del panel de administrador
 │   ├── almacenamiento.ts  localStorage con manejo de errores
 │   ├── auth.ts            Registro, inicio de sesión, perfil y cuentas de la versión anterior
+│   ├── bienvenida.ts      Aviso de "te enviamos un correo" después de registrarse
 │   ├── config.ts          URL de Google Sheets y datos de contacto de EcoConecta
 │   ├── imagenes.ts        Compresión de fotos e IndexedDB
 │   ├── pendientes.ts      Cambios que la hoja todavía no confirmó

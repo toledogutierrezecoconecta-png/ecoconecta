@@ -75,7 +75,7 @@ export function Footer() {
 
         <div className="mt-10 flex flex-col gap-2 border-t border-humo-200 pt-6 text-xs text-humo-500 sm:flex-row sm:items-center sm:justify-between">
           <p>© {new Date().getFullYear()} EcoConecta SCZ. Todos los derechos reservados.</p>
-          <p>Versión de demostración con datos de ejemplo.</p>
+          <p>Hecho en Santa Cruz de la Sierra para la economía circular.</p>
         </div>
       </div>
     </footer>

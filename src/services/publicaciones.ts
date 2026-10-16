@@ -1,4 +1,3 @@
-import { PUBLICACIONES_DEMO } from '../data/seed'
 import type {
   BorradorPublicacion,
   ContactoRecibido,
@@ -47,14 +46,8 @@ import type { ResultadoEnvio } from './sheets'
 
 function cargarLocales(): Publicacion[] {
   const guardadas = leer<Publicacion[] | null>(CLAVES.publicaciones, null)
-
-  // Primer acceso: se siembran las publicaciones de demostración.
-  if (!guardadas) {
-    escribir(CLAVES.publicaciones, PUBLICACIONES_DEMO)
-    return PUBLICACIONES_DEMO
-  }
-
-  return guardadas
+  // Solo publicaciones reales: las de ejemplo de versiones anteriores se descartan.
+  return Array.isArray(guardadas) ? guardadas.filter((publicacion) => publicacion.origen !== 'demo') : []
 }
 
 function guardarLocales(publicaciones: Publicacion[]): void {

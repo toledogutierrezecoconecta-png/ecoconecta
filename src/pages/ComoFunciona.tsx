@@ -164,7 +164,7 @@ export function ComoFunciona() {
         </div>
       </section>
 
-      <section className="bg-humo-50 py-16 md:py-20" id="quienes">
+      <section className="scroll-mt-16 bg-humo-50 py-16 md:py-20" id="quienes">
         <div className="contenedor max-w-3xl">
           <h2 className="text-3xl font-extrabold tracking-tight text-humo-800">Sobre nosotros</h2>
 
@@ -213,7 +213,7 @@ export function ComoFunciona() {
         </div>
       </section>
 
-      <section className="contenedor py-16 md:py-20" id="preguntas">
+      <section className="contenedor scroll-mt-16 py-16 md:py-20" id="preguntas">
         <h2 className="text-3xl font-extrabold tracking-tight text-humo-800">
           Preguntas frecuentes
         </h2>
@@ -233,7 +233,7 @@ export function ComoFunciona() {
         </div>
       </section>
 
-      <section className="bg-humo-50 py-16 md:py-20" id="contacto">
+      <section className="scroll-mt-16 bg-humo-50 py-16 md:py-20" id="contacto">
         <div className="contenedor max-w-2xl text-center">
           <h2 className="text-3xl font-extrabold tracking-tight text-humo-800">Contacto</h2>
           <p className="mt-3 text-humo-600">

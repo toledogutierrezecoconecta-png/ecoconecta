@@ -26,8 +26,8 @@ function PaginaLegal({
           <Icono nombre="alerta" className="h-5 w-5" />
         </span>
         <p className="text-sm text-tierra-800">
-          Este documento es un texto de referencia para la versión de demostración de EcoConecta SCZ.
-          Antes de operar comercialmente debe ser revisado por un profesional legal.
+          Este documento es un texto de referencia de EcoConecta SCZ. Antes de operar
+          comercialmente debe ser revisado por un profesional legal.
         </p>
       </div>
 

@@ -1,5 +1,6 @@
 import type { CredencialesRegistro, PerfilEditable, Usuario, UsuarioAlmacenado } from '../types'
 import { CLAVES, escribir, leer } from './almacenamiento'
+import { anotarBienvenida } from './bienvenida'
 import { borrarSesion, guardarSesion, obtenerUsuario, actualizarUsuario } from './sesion'
 import { llamar } from './sheets'
 import type { RespuestaHoja } from './sheets'
@@ -32,8 +33,14 @@ function abrirSesion(respuesta: RespuestaSesion | null): Usuario {
 }
 
 export async function registrar(credenciales: CredencialesRegistro): Promise<Usuario> {
-  const respuesta = (await llamar('registrar_usuario', { ...credenciales })) as RespuestaSesion | null
-  return abrirSesion(respuesta)
+  const respuesta = (await llamar('registrar_usuario', { ...credenciales })) as
+    | (RespuestaSesion & { correoEnviado?: boolean })
+    | null
+  const usuario = abrirSesion(respuesta)
+
+  // El panel avisa una vez si salió el correo de confirmación.
+  anotarBienvenida({ correo: usuario.correo, correoEnviado: Boolean(respuesta?.correoEnviado) })
+  return usuario
 }
 
 export async function iniciarSesion(correo: string, clave: string): Promise<Usuario> {

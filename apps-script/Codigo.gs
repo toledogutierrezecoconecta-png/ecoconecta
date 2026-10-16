@@ -14,30 +14,45 @@
  *   - Contactos: quién consultó por cada publicación (una vez por cuenta).
  *   - Guardados: las publicaciones que cada usuario marcó con el corazón.
  *   - Recuperar la contraseña con un código de 6 dígitos enviado por correo.
+ *   - Correo de confirmación al registrarse.
+ *   - Fecha y hora de Bolivia, legibles, en cada registro, publicación y contacto.
+ *   - Panel de administrador en la web, protegido con la clave CLAVE_ADMIN.
  *
  * Hojas que usa (se crean solas, y si les faltan columnas se agregan al final):
  *
- *   Usuarios, Publicaciones, Contactos, Sesiones, Guardados, Recuperaciones
+ *   Empresas, Recolectores, Ambos   cuentas, separadas por tipo de usuario
+ *   Publicaciones, Contactos
+ *   Sesiones, Guardados, Recuperaciones   (técnicas: quedan ocultas)
  *
- * INSTALACIÓN: ver README.md, sección "Publicar cambios". Este archivo se sube
- * con clasp (npm run sheets:publicar); no hace falta copiarlo a mano.
+ * INSTALACIÓN: ver README.md, sección "Conectar con Google Sheets". Al pasar de
+ * una versión anterior hay que ejecutar UNA vez la función actualizarHojas.
  */
 
-var HOJA_USUARIOS = 'Usuarios'
+var ZONA_HORARIA = 'America/La_Paz'
 var HOJA_PUBLICACIONES = 'Publicaciones'
 var HOJA_CONTACTOS = 'Contactos'
 var HOJA_SESIONES = 'Sesiones'
 var HOJA_GUARDADOS = 'Guardados'
 
+/** Cada tipo de cuenta vive en su propia pestaña. */
+var HOJA_POR_TIPO = { oferente: 'Empresas', recolector: 'Recolectores', ambos: 'Ambos' }
+
+/**
+ * Las columnas se leen por posición: el orden de estas listas es el orden de
+ * la hoja. Fecha y Hora van primero para que la hoja se lea de un vistazo.
+ */
 var COLUMNAS_USUARIOS = [
-  'id',
+  'fecha',
+  'hora',
   'empresa',
   'contacto',
   'telefono',
   'correo',
   'tipo',
-  'creadoEn',
+  'correoConfirmacion',
   'zonaInteres',
+  'id',
+  'creadoEn',
   'hashClave',
   'sal',
 ]
@@ -55,32 +70,34 @@ var CAMPOS_PUBLICOS_USUARIO = [
 ]
 
 var COLUMNAS_PUBLICACIONES = [
-  'id',
+  'fecha',
+  'hora',
   'titulo',
-  'categoriaId',
-  'materialId',
-  'descripcion',
+  'empresa',
+  'contacto',
+  'telefono',
+  'estado',
   'cantidad',
   'unidad',
   'frecuencia',
   'zona',
   'direccion',
+  'descripcion',
   'modalidadPrecio',
   'valorEstimadoMin',
   'valorEstimadoMax',
   'fechaDisponible',
-  'estado',
   'contactos',
+  'categoriaId',
+  'materialId',
   'usuarioId',
-  'empresa',
-  'contacto',
-  'telefono',
+  'id',
   'creadaEn',
   'origen',
 ]
 
-/** usuarioId vacío = contacto de un visitante sin cuenta. */
-var COLUMNAS_CONTACTOS = ['publicacionId', 'fecha', 'usuarioId', 'empresa', 'contacto', 'tipo']
+/** usuarioId vacío = contacto de un visitante sin cuenta. empresa/contacto/tipo: quién consultó. */
+var COLUMNAS_CONTACTOS = ['fecha', 'hora', 'titulo', 'publicacionId', 'usuarioId', 'empresa', 'contacto', 'tipo']
 
 /** expiraEn en milisegundos: un número evita que Sheets lo convierta en fecha. */
 var COLUMNAS_SESIONES = ['token', 'usuarioId', 'creadaEn', 'expiraEn']
@@ -90,6 +107,64 @@ var COLUMNAS_GUARDADOS = ['usuarioId', 'publicacionId', 'fecha']
 /** Códigos para restablecer la contraseña. El código se guarda como hash, nunca tal cual. */
 var HOJA_RECUPERACIONES = 'Recuperaciones'
 var COLUMNAS_RECUPERACIONES = ['correo', 'hashCodigo', 'sal', 'creadoEn', 'expiraEn', 'intentos', 'usado']
+
+/** Pestañas que solo usa el script: se ocultan para que la hoja se lea mejor. */
+var HOJAS_TECNICAS = [HOJA_SESIONES, HOJA_GUARDADOS, HOJA_RECUPERACIONES]
+
+/**
+ * Títulos que se ven en la fila 1. Las columnas sin título acá muestran su
+ * nombre interno (las pestañas técnicas). Se puede renombrar un título en la
+ * hoja sin romper nada, porque el script lee por posición.
+ */
+var TITULOS = {
+  fecha: 'Fecha',
+  hora: 'Hora',
+  empresa: 'Empresa / negocio',
+  contacto: 'Contacto',
+  telefono: 'Teléfono',
+  correo: 'Correo',
+  tipo: 'Tipo',
+  correoConfirmacion: 'Correo de confirmación',
+  zonaInteres: 'Zona de interés',
+  id: 'ID',
+  creadoEn: 'Creado (UTC)',
+  creadaEn: 'Creada (UTC)',
+  hashClave: 'hashClave',
+  sal: 'sal',
+  titulo: 'Título',
+  estado: 'Estado',
+  cantidad: 'Cantidad',
+  unidad: 'Unidad',
+  frecuencia: 'Frecuencia',
+  zona: 'Zona',
+  direccion: 'Dirección',
+  descripcion: 'Descripción',
+  modalidadPrecio: 'Modalidad',
+  valorEstimadoMin: 'Valor estimado mín. (Bs)',
+  valorEstimadoMax: 'Valor estimado máx. (Bs)',
+  fechaDisponible: 'Disponible desde',
+  contactos: 'Contactos recibidos',
+  categoriaId: 'Categoría',
+  materialId: 'Material',
+  usuarioId: 'ID usuario',
+  origen: 'Origen',
+  publicacionId: 'ID publicación',
+}
+
+/** Formato de cada columna. Teléfonos y textos como texto: así no pierden ceros. */
+var FORMATOS = {
+  fecha: 'dd/mm/yyyy',
+  hora: 'HH:mm',
+  telefono: '@',
+  fechaDisponible: '@',
+}
+
+/** Columnas que nadie necesita ver: se ocultan (siguen ahí para el script). */
+var COLUMNAS_OCULTAS = ['hashClave', 'sal']
+
+/** Clave del administrador: Configuración del proyecto → Propiedades de la secuencia de comandos. */
+var PROPIEDAD_CLAVE_ADMIN = 'CLAVE_ADMIN'
+var INTENTOS_ADMIN = 8
 
 var MINUTOS_CODIGO = 15
 var INTENTOS_CODIGO = 5
@@ -104,35 +179,54 @@ var ESTADOS = ['disponible', 'pausada', 'concretada']
 
 // ================================================================= utilidades
 
+function titulo(columna) {
+  return TITULOS[columna] || columna
+}
+
+/** Aplica formatos y oculta columnas técnicas desde la columna `desde` (base 1). */
+function prepararColumnas(hoja, columnas, desde) {
+  var filas = Math.max(hoja.getMaxRows() - 1, 1)
+  columnas.forEach(function (columna, posicion) {
+    var numero = desde + posicion
+    if (FORMATOS[columna]) hoja.getRange(2, numero, filas, 1).setNumberFormat(FORMATOS[columna])
+    if (COLUMNAS_OCULTAS.indexOf(columna) !== -1) hoja.hideColumns(numero)
+  })
+}
+
 /** Devuelve la hoja; si no existe la crea, y si le faltan columnas las agrega al final. */
 function obtenerHoja(nombre, columnas) {
   // Si se ejecuta sola desde el editor (sin nombre ni columnas), no crea
   // una pestaña vacía: avisa qué función había que elegir.
   if (!nombre || !columnas) {
-    throw new Error('Esta función no se ejecuta sola. Elegí "autorizarCorreo" en el menú de funciones y tocá Ejecutar.')
+    throw new Error('Esta función no se ejecuta sola. Elegí "actualizarHojas" en el menú de funciones y tocá Ejecutar.')
   }
 
   var libro = SpreadsheetApp.getActiveSpreadsheet()
   var hoja = libro.getSheetByName(nombre)
+  var titulos = columnas.map(titulo)
 
   if (!hoja) {
     hoja = libro.insertSheet(nombre)
-    hoja.appendRow(columnas)
-    hoja.getRange(1, 1, 1, columnas.length).setFontWeight('bold')
+    hoja.appendRow(titulos)
+    hoja.getRange(1, 1, 1, titulos.length).setFontWeight('bold')
     hoja.setFrozenRows(1)
+    prepararColumnas(hoja, columnas, 1)
+    if (HOJAS_TECNICAS.indexOf(nombre) !== -1) hoja.hideSheet()
     return hoja
   }
 
+  // Una columna existe si su título está, o su nombre interno (hojas de antes).
   var ancho = Math.max(hoja.getLastColumn(), 1)
   var encabezado = hoja.getRange(1, 1, 1, ancho).getValues()[0].map(String)
   var faltantes = columnas.filter(function (columna) {
-    return encabezado.indexOf(columna) === -1
+    return encabezado.indexOf(titulo(columna)) === -1 && encabezado.indexOf(columna) === -1
   })
 
   if (faltantes.length > 0) {
     var desde = encabezado.filter(String).length + 1
-    hoja.getRange(1, desde, 1, faltantes.length).setValues([faltantes])
+    hoja.getRange(1, desde, 1, faltantes.length).setValues([faltantes.map(titulo)])
     hoja.getRange(1, desde, 1, faltantes.length).setFontWeight('bold')
+    prepararColumnas(hoja, faltantes, desde)
   }
 
   return hoja
@@ -223,6 +317,36 @@ function calcularHash(clave, sal) {
   return Utilities.base64Encode(bytes)
 }
 
+/** Pestaña de un tipo de cuenta. */
+function hojaDeTipo(tipo) {
+  return obtenerHoja(HOJA_POR_TIPO[tipo] || HOJA_POR_TIPO.oferente, COLUMNAS_USUARIOS)
+}
+
+/** Todas las cuentas de las tres pestañas. Cada fila sabe en qué hoja está (`_hoja`). */
+function leerCuentas() {
+  var cuentas = []
+  Object.keys(HOJA_POR_TIPO).forEach(function (tipo) {
+    var hoja = hojaDeTipo(tipo)
+    leerFilas(hoja, COLUMNAS_USUARIOS).forEach(function (fila) {
+      fila._hoja = hoja
+      cuentas.push(fila)
+    })
+  })
+  return cuentas
+}
+
+function buscarCuenta(campo, valor) {
+  return buscar(leerCuentas(), campo, valor)
+}
+
+/** Agrega una cuenta nueva en la pestaña de su tipo, con fecha y hora de hoy. */
+function agregarCuenta(fila) {
+  var ahora = new Date()
+  if (!fila.fecha) fila.fecha = ahora
+  if (!fila.hora) fila.hora = fila.fecha
+  hojaDeTipo(fila.tipo).appendRow(filaDesdeObjeto(fila, COLUMNAS_USUARIOS))
+}
+
 function usuarioPublico(fila) {
   var usuario = {}
   CAMPOS_PUBLICOS_USUARIO.forEach(function (campo) {
@@ -285,32 +409,42 @@ function registrarUsuario(datos) {
   var error = validarPerfil(datos)
   if (error) return rechazo('datos_invalidos', error)
 
-  var hoja = obtenerHoja(HOJA_USUARIOS, COLUMNAS_USUARIOS)
-  if (buscar(leerFilas(hoja, COLUMNAS_USUARIOS), 'correo', correo)) {
+  if (buscarCuenta('correo', correo)) {
     return rechazo('correo_existente', 'Ya existe una cuenta registrada con ese correo electrónico.')
   }
 
   var sal = Utilities.getUuid()
+  var ahora = new Date()
   var fila = {
+    fecha: ahora,
+    hora: ahora,
     id: generarId('usr'),
     empresa: texto(datos.empresa, 120),
     contacto: texto(datos.contacto, 120),
     telefono: texto(datos.telefono, 30).replace(/\s+/g, ''),
     correo: correo,
     tipo: datos.tipo,
-    creadoEn: new Date().toISOString(),
+    creadoEn: ahora.toISOString(),
     zonaInteres: '',
     hashClave: calcularHash(clave, sal),
     sal: sal,
   }
 
-  hoja.appendRow(filaDesdeObjeto(fila, COLUMNAS_USUARIOS))
-  return entregarSesion(fila)
+  var correoEnviado = enviarBienvenida(fila)
+  fila.correoConfirmacion = correoEnviado ? 'Enviado' : 'No se pudo enviar'
+  agregarCuenta(fila)
+
+  return respuesta({
+    ok: true,
+    usuario: usuarioPublico(fila),
+    token: crearSesion(String(fila.id)),
+    correoEnviado: correoEnviado,
+  })
 }
 
 function iniciarSesion(datos) {
   var correo = texto(datos.correo, 200).toLowerCase()
-  var fila = buscar(leerFilas(obtenerHoja(HOJA_USUARIOS, COLUMNAS_USUARIOS), COLUMNAS_USUARIOS), 'correo', correo)
+  var fila = buscarCuenta('correo', correo)
 
   if (!fila) return rechazo('no_existe', 'No encontramos una cuenta con ese correo.')
   // Cuenta creada antes de que existieran las contraseñas en la hoja: la web
@@ -339,8 +473,7 @@ function reclamarCuenta(datos) {
     return rechazo('datos_invalidos', 'Los datos de la cuenta no son válidos.')
   }
 
-  var hoja = obtenerHoja(HOJA_USUARIOS, COLUMNAS_USUARIOS)
-  var filas = leerFilas(hoja, COLUMNAS_USUARIOS)
+  var filas = leerCuentas()
   var existente = buscar(filas, 'correo', correo)
   var sal = Utilities.getUuid()
 
@@ -350,7 +483,7 @@ function reclamarCuenta(datos) {
 
     existente.hashClave = calcularHash(clave, sal)
     existente.sal = sal
-    escribirFila(hoja, existente._fila, existente, COLUMNAS_USUARIOS)
+    escribirFila(existente._hoja, existente._fila, existente, COLUMNAS_USUARIOS)
     return entregarSesion(existente)
   }
 
@@ -365,20 +498,27 @@ function reclamarCuenta(datos) {
   var error = validarPerfil(perfil)
   if (error) return rechazo('datos_invalidos', error)
 
+  var creadoEn = texto(usuario.creadoEn, 40) || new Date().toISOString()
+  var fecha = new Date(creadoEn)
+  if (isNaN(fecha.getTime())) fecha = new Date()
+
   var fila = {
+    fecha: fecha,
+    hora: fecha,
+    correoConfirmacion: 'Cuenta anterior (sin correo)',
     id: id,
     empresa: texto(perfil.empresa, 120),
     contacto: texto(perfil.contacto, 120),
     telefono: texto(perfil.telefono, 30).replace(/\s+/g, ''),
     correo: correo,
     tipo: perfil.tipo,
-    creadoEn: texto(usuario.creadoEn, 40) || new Date().toISOString(),
+    creadoEn: creadoEn,
     zonaInteres: texto(usuario.zonaInteres, 20),
     hashClave: calcularHash(clave, sal),
     sal: sal,
   }
 
-  hoja.appendRow(filaDesdeObjeto(fila, COLUMNAS_USUARIOS))
+  agregarCuenta(fila)
   return entregarSesion(fila)
 }
 
@@ -406,7 +546,7 @@ function solicitarRecuperacion(datos) {
   var correo = texto(datos.correo, 200).toLowerCase()
   if (!correoValido(correo)) return rechazo('datos_invalidos', 'El correo no es válido.')
 
-  var cuenta = buscar(leerFilas(obtenerHoja(HOJA_USUARIOS, COLUMNAS_USUARIOS), COLUMNAS_USUARIOS), 'correo', correo)
+  var cuenta = buscarCuenta('correo', correo)
   if (!cuenta) return respuesta({ ok: true })
 
   var hoja = obtenerHoja(HOJA_RECUPERACIONES, COLUMNAS_RECUPERACIONES)
@@ -523,8 +663,7 @@ function restablecerClave(datos) {
     )
   }
 
-  var hojaUsuarios = obtenerHoja(HOJA_USUARIOS, COLUMNAS_USUARIOS)
-  var cuenta = buscar(leerFilas(hojaUsuarios, COLUMNAS_USUARIOS), 'correo', correo)
+  var cuenta = buscarCuenta('correo', correo)
   if (!cuenta) return rechazo('codigo_invalido', 'El código no es válido. Pedí uno nuevo.')
 
   hoja.getRange(vigente._fila, COLUMNAS_RECUPERACIONES.indexOf('usado') + 1).setValue(true)
@@ -532,7 +671,7 @@ function restablecerClave(datos) {
   var sal = Utilities.getUuid()
   cuenta.hashClave = calcularHash(clave, sal)
   cuenta.sal = sal
-  escribirFila(hojaUsuarios, cuenta._fila, cuenta, COLUMNAS_USUARIOS)
+  escribirFila(cuenta._hoja, cuenta._fila, cuenta, COLUMNAS_USUARIOS)
 
   // Si alguien más tenía la sesión abierta, deja de servirle.
   cerrarSesionesDe(String(cuenta.id))
@@ -546,8 +685,163 @@ function restablecerClave(datos) {
  */
 function autorizarCorreo() {
   var cuenta = Session.getEffectiveUser().getEmail()
-  MailApp.sendEmail(cuenta, 'EcoConecta SCZ: envío de correos autorizado', 'Listo: el script ya puede enviar los códigos para restablecer contraseñas.')
+  MailApp.sendEmail(cuenta, 'EcoConecta SCZ: envío de correos autorizado', 'Listo: el script ya puede enviar los correos de confirmación y los códigos para restablecer contraseñas.')
   Logger.log('Correo de prueba enviado a ' + cuenta + '. Quedan ' + MailApp.getRemainingDailyQuota() + ' envíos hoy.')
+}
+
+// ======================================================= actualizar la hoja
+
+/** Columnas de la versión anterior (11/10), en su orden. */
+var ANTERIOR_USUARIOS = ['id', 'empresa', 'contacto', 'telefono', 'correo', 'tipo', 'creadoEn', 'zonaInteres', 'hashClave', 'sal']
+var ANTERIOR_PUBLICACIONES = [
+  'id', 'titulo', 'categoriaId', 'materialId', 'descripcion', 'cantidad', 'unidad', 'frecuencia', 'zona',
+  'direccion', 'modalidadPrecio', 'valorEstimadoMin', 'valorEstimadoMax', 'fechaDisponible', 'estado',
+  'contactos', 'usuarioId', 'empresa', 'contacto', 'telefono', 'creadaEn', 'origen',
+]
+var ANTERIOR_CONTACTOS = ['publicacionId', 'fecha', 'usuarioId', 'empresa', 'contacto', 'tipo']
+
+/** Fecha a partir de lo que haya en la celda (fecha de Sheets o texto ISO). */
+function fechaDesde(valor) {
+  if (esFecha(valor)) return valor
+  var fecha = new Date(String(valor))
+  return isNaN(fecha.getTime()) ? new Date() : fecha
+}
+
+/** Renombra y oculta una pestaña vieja en lugar de borrarla. */
+function respaldar(hoja, nombre) {
+  var libro = SpreadsheetApp.getActiveSpreadsheet()
+  var destino = nombre
+  for (var n = 2; libro.getSheetByName(destino); n++) destino = nombre + ' ' + n
+  hoja.setName(destino)
+  hoja.hideSheet()
+}
+
+/**
+ * Pasa la hoja del formato anterior al nuevo. Ejecutar UNA vez desde el
+ * editor (menú de funciones → actualizarHojas → Ejecutar).
+ *
+ *   - Hora de Bolivia para toda la hoja.
+ *   - "Usuarios" se reparte en Empresas, Recolectores y Ambos, con sus
+ *     contraseñas: nadie tiene que crear una nueva.
+ *   - Publicaciones y Contactos ganan Fecha y Hora legibles.
+ *   - Las pestañas viejas NO se borran: quedan ocultas con "(respaldo)".
+ *   - Las pestañas técnicas (Sesiones, Guardados, Recuperaciones) se ocultan.
+ *
+ * Se puede ejecutar más de una vez: lo que ya está convertido no se duplica.
+ */
+function actualizarHojas() {
+  var libro = SpreadsheetApp.getActiveSpreadsheet()
+
+  // La versión del 16/10 usaba otras columnas y no guardaba las contraseñas
+  // en la hoja: convertirla perdería cuentas. Hay que volver antes a la hoja
+  // del 11/10 con el historial de versiones.
+  var empresas = libro.getSheetByName('Empresas')
+  if (empresas && String(empresas.getRange(1, 9).getValue()) === 'ID') {
+    throw new Error(
+      'La hoja tiene el formato de la versión del 16/10. Primero restaurá la versión anterior ' +
+        '(Archivo → Historial de versiones) y después volvé a ejecutar actualizarHojas.',
+    )
+  }
+
+  libro.setSpreadsheetTimeZone(ZONA_HORARIA)
+  var resumen = []
+
+  // 1. Cuentas: de "Usuarios" a una pestaña por tipo.
+  var usuarios = libro.getSheetByName('Usuarios')
+  if (usuarios) {
+    var yaEstan = {}
+    leerCuentas().forEach(function (fila) {
+      yaEstan[String(fila.id)] = true
+    })
+
+    var movidas = 0
+    leerFilas(usuarios, ANTERIOR_USUARIOS).forEach(function (fila) {
+      if (yaEstan[String(fila.id)] || /^PRUEBA CLAUDE/i.test(String(fila.empresa))) return
+
+      var fecha = fechaDesde(fila.creadoEn)
+      fila.fecha = fecha
+      fila.hora = fecha
+      fila.tipo = HOJA_POR_TIPO[fila.tipo] ? fila.tipo : 'oferente'
+      fila.creadoEn = formatearMarcaTemporal(fila.creadoEn)
+      fila.telefono = normalizarTelefono(fila.telefono)
+      fila.correo = String(fila.correo).toLowerCase()
+      fila.correoConfirmacion = 'Registro anterior (sin correo)'
+      agregarCuenta(fila)
+      movidas++
+    })
+
+    respaldar(usuarios, 'Usuarios (respaldo)')
+    resumen.push('Cuentas repartidas en Empresas, Recolectores y Ambos: ' + movidas)
+  }
+
+  // 2. Publicaciones del formato anterior (la columna A se llamaba "id").
+  var publicaciones = libro.getSheetByName(HOJA_PUBLICACIONES)
+  if (publicaciones && String(publicaciones.getRange(1, 1).getValue()) === 'id') {
+    var filasPublicaciones = leerFilas(publicaciones, ANTERIOR_PUBLICACIONES)
+    respaldar(publicaciones, 'Publicaciones (respaldo)')
+    var nuevas = obtenerHoja(HOJA_PUBLICACIONES, COLUMNAS_PUBLICACIONES)
+
+    filasPublicaciones.forEach(function (fila) {
+      var creada = fechaDesde(fila.creadaEn)
+      fila.fecha = creada
+      fila.hora = creada
+      fila.creadaEn = formatearMarcaTemporal(fila.creadaEn)
+      fila.telefono = normalizarTelefono(fila.telefono)
+      fila.fechaDisponible = formatearFecha(fila.fechaDisponible)
+      nuevas.appendRow(filaDesdeObjeto(fila, COLUMNAS_PUBLICACIONES))
+    })
+    resumen.push('Publicaciones con fecha y hora: ' + filasPublicaciones.length)
+  }
+
+  // 3. Contactos del formato anterior (la columna A se llamaba "publicacionId").
+  var contactos = libro.getSheetByName(HOJA_CONTACTOS)
+  if (contactos && String(contactos.getRange(1, 1).getValue()) === 'publicacionId') {
+    var filasContactos = leerFilas(contactos, ANTERIOR_CONTACTOS)
+    respaldar(contactos, 'Contactos (respaldo)')
+    var nuevosContactos = obtenerHoja(HOJA_CONTACTOS, COLUMNAS_CONTACTOS)
+    var titulos = {}
+    leerFilas(obtenerHoja(HOJA_PUBLICACIONES, COLUMNAS_PUBLICACIONES), COLUMNAS_PUBLICACIONES).forEach(
+      function (publicacion) {
+        titulos[String(publicacion.id)] = String(publicacion.titulo)
+      },
+    )
+
+    filasContactos.forEach(function (fila) {
+      var fecha = fechaDesde(fila.fecha)
+      fila.fecha = fecha
+      fila.hora = fecha
+      fila.titulo = titulos[String(fila.publicacionId)] || '(publicación eliminada o de ejemplo)'
+      nuevosContactos.appendRow(filaDesdeObjeto(fila, COLUMNAS_CONTACTOS))
+    })
+    resumen.push('Contactos con fecha y hora: ' + filasContactos.length)
+  }
+
+  // 4. Pestañas que falten, técnicas ocultas y orden de lectura.
+  Object.keys(HOJA_POR_TIPO).forEach(hojaDeTipo)
+  obtenerHoja(HOJA_PUBLICACIONES, COLUMNAS_PUBLICACIONES)
+  obtenerHoja(HOJA_CONTACTOS, COLUMNAS_CONTACTOS)
+  obtenerHoja(HOJA_SESIONES, COLUMNAS_SESIONES).hideSheet()
+  obtenerHoja(HOJA_GUARDADOS, COLUMNAS_GUARDADOS).hideSheet()
+  obtenerHoja(HOJA_RECUPERACIONES, COLUMNAS_RECUPERACIONES).hideSheet()
+
+  var orden = ['Empresas', 'Recolectores', 'Ambos', HOJA_PUBLICACIONES, HOJA_CONTACTOS]
+  orden.forEach(function (nombre, posicion) {
+    libro.setActiveSheet(libro.getSheetByName(nombre))
+    libro.moveActiveSheet(posicion + 1)
+  })
+  libro.setActiveSheet(libro.getSheetByName('Empresas'))
+
+  // 5. Lo que necesita el script para funcionar.
+  resumen.push('Correos disponibles hoy: ' + MailApp.getRemainingDailyQuota())
+  resumen.push(
+    PropertiesService.getScriptProperties().getProperty(PROPIEDAD_CLAVE_ADMIN)
+      ? 'Clave de administrador: configurada'
+      : 'Clave de administrador: FALTA (agregá CLAVE_ADMIN en las propiedades del script)',
+  )
+
+  var texto = 'Listo.\n' + resumen.join('\n')
+  Logger.log(texto)
+  return texto
 }
 
 function cerrarSesion(token) {
@@ -562,16 +856,23 @@ function actualizarPerfil(usuarioId, datos) {
   var error = validarPerfil(datos)
   if (error) return rechazo('datos_invalidos', error)
 
-  var hoja = obtenerHoja(HOJA_USUARIOS, COLUMNAS_USUARIOS)
-  var fila = buscar(leerFilas(hoja, COLUMNAS_USUARIOS), 'id', usuarioId)
+  var fila = buscarCuenta('id', usuarioId)
   if (!fila) return rechazo('sesion_invalida', 'La cuenta ya no existe.')
 
+  var tipoAnterior = String(fila.tipo)
   fila.empresa = texto(datos.empresa, 120)
   fila.contacto = texto(datos.contacto, 120)
   fila.telefono = texto(datos.telefono, 30).replace(/\s+/g, '')
   fila.tipo = datos.tipo
   fila.zonaInteres = texto(datos.zonaInteres, 20)
-  escribirFila(hoja, fila._fila, fila, COLUMNAS_USUARIOS)
+
+  if (tipoAnterior === fila.tipo) {
+    escribirFila(fila._hoja, fila._fila, fila, COLUMNAS_USUARIOS)
+  } else {
+    // Cambió de tipo: la cuenta se muda a la pestaña que le corresponde.
+    fila._hoja.deleteRow(fila._fila)
+    agregarCuenta(fila)
+  }
 
   var hojaPublicaciones = obtenerHoja(HOJA_PUBLICACIONES, COLUMNAS_PUBLICACIONES)
   var actualizadas = 0
@@ -591,7 +892,7 @@ function actualizarPerfil(usuarioId, datos) {
 
 /** Fila de Usuarios de la sesión actual, o null si la cuenta ya no existe. */
 function buscarUsuario(usuarioId) {
-  return buscar(leerFilas(obtenerHoja(HOJA_USUARIOS, COLUMNAS_USUARIOS), COLUMNAS_USUARIOS), 'id', usuarioId)
+  return buscarCuenta('id', usuarioId)
 }
 
 /** Limpia una publicación que llega de la web y fija los campos que decide el servidor. */
@@ -617,6 +918,12 @@ function prepararPublicacion(datos, usuario, existente) {
   publicacion.creadaEn = existente
     ? formatearMarcaTemporal(existente.creadaEn)
     : publicacion.creadaEn || new Date().toISOString()
+
+  // Fecha y hora legibles: las de creación, que no cambian al editar.
+  var creada = existente && esFecha(existente.fecha) ? existente.fecha : new Date(publicacion.creadaEn)
+  if (!esFecha(creada)) creada = new Date()
+  publicacion.fecha = creada
+  publicacion.hora = creada
 
   return publicacion
 }
@@ -681,7 +988,13 @@ function registrarContacto(usuarioId, datos) {
   if (!publicacion) return respuesta({ ok: true, nuevo: false })
 
   var hojaContactos = obtenerHoja(HOJA_CONTACTOS, COLUMNAS_CONTACTOS)
-  var contacto = { publicacionId: String(publicacion.id), fecha: new Date().toISOString() }
+  var ahora = new Date()
+  var contacto = {
+    fecha: ahora,
+    hora: ahora,
+    titulo: String(publicacion.titulo),
+    publicacionId: String(publicacion.id),
+  }
 
   if (usuarioId) {
     if (String(publicacion.usuarioId) === usuarioId) return respuesta({ ok: true, nuevo: false })
@@ -778,6 +1091,195 @@ function miActividad(usuarioId) {
   return respuesta({ ok: true, guardados: guardados, contactos: contactos })
 }
 
+// ================================================================== correos
+
+var NOMBRE_TIPO = {
+  oferente: 'Empresa / oferente',
+  recolector: 'Recolector / comprador',
+  ambos: 'Oferente y recolector',
+}
+
+function horaDeBolivia(fecha) {
+  return Utilities.formatDate(fecha, ZONA_HORARIA, 'dd/MM/yyyy HH:mm')
+}
+
+function datoCorreo(etiqueta, valor) {
+  return (
+    '<tr><td style="padding:4px 16px 4px 0;color:#6d7a74">' + etiqueta +
+    '</td><td style="padding:4px 0;font-weight:bold">' + escaparHtml(valor) + '</td></tr>'
+  )
+}
+
+/** Correo de confirmación del registro. Devuelve false si no se pudo enviar. */
+function enviarBienvenida(cuenta) {
+  try {
+    var pasos =
+      cuenta.tipo === 'recolector'
+        ? '<li>Explorá los materiales disponibles en Santa Cruz.</li>' +
+          '<li>Contactá directamente a los negocios por WhatsApp.</li>'
+        : '<li>Publicá tu primer residuo: te calculamos su valor estimado.</li>' +
+          '<li>Los recolectores interesados te contactan por WhatsApp.</li>'
+
+    MailApp.sendEmail({
+      to: cuenta.correo,
+      name: 'EcoConecta SCZ',
+      subject: '¡Bienvenido a EcoConecta SCZ, ' + cuenta.contacto + '!',
+      body:
+        'Hola ' + cuenta.contacto + ',\n\n' +
+        'Confirmamos el registro de ' + cuenta.empresa + ' en EcoConecta SCZ como ' +
+        NOMBRE_TIPO[cuenta.tipo] + '.\n\n' +
+        'Correo: ' + cuenta.correo + '\nTeléfono / WhatsApp: ' + cuenta.telefono + '\n' +
+        'Fecha de registro: ' + horaDeBolivia(cuenta.fecha) + '\n\n' +
+        'Ingresá en ' + URL_SITIO + '\n\nEcoConecta SCZ — Santa Cruz de la Sierra',
+      htmlBody:
+        '<div style="background:#f3f6f4;padding:24px 12px;font-family:Arial,sans-serif;color:#222a26">' +
+        '<div style="max-width:520px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden">' +
+        '<div style="padding:20px 24px;border-bottom:1px solid #e5e9e7">' +
+        '<img src="' + URL_SITIO + 'logo-correo.png" alt="EcoConecta SCZ" width="190" style="display:block"></div>' +
+        '<div style="padding:24px;font-size:15px;line-height:1.6">' +
+        '<h1 style="font-size:21px;margin:0 0 14px;color:#0f4a2d">¡Tu cuenta está lista!</h1>' +
+        '<p>Hola ' + escaparHtml(cuenta.contacto) + ',</p>' +
+        '<p>Confirmamos el registro de <b>' + escaparHtml(cuenta.empresa) +
+        '</b> en EcoConecta SCZ como <b>' + NOMBRE_TIPO[cuenta.tipo] + '</b>.</p>' +
+        '<table style="border-collapse:collapse;margin:12px 0;font-size:14px">' +
+        datoCorreo('Correo', cuenta.correo) +
+        datoCorreo('Teléfono / WhatsApp', cuenta.telefono) +
+        datoCorreo('Fecha de registro', horaDeBolivia(cuenta.fecha)) +
+        '</table><p><b>Próximos pasos:</b></p><ul>' + pasos + '</ul>' +
+        '<p style="margin:24px 0"><a href="' + URL_SITIO + '" style="background:#16613c;color:#fff;' +
+        'padding:11px 20px;border-radius:10px;text-decoration:none;display:inline-block">Ir a EcoConecta SCZ</a></p>' +
+        '</div><div style="padding:14px 24px;background:#f7f9f8;font-size:12px;color:#6d7a74">' +
+        'EcoConecta SCZ · Santa Cruz de la Sierra, Bolivia.<br>Recibís este correo porque se registró esta dirección.' +
+        '</div></div></div>',
+    })
+    return true
+  } catch (error) {
+    console.error('No se pudo enviar el correo de bienvenida', error)
+    return false
+  }
+}
+
+// ============================================================ administrador
+
+/**
+ * Verifica la clave de administrador. Tras varios intentos fallidos se
+ * bloquea 15 minutos, para que no se pueda adivinar probando.
+ */
+function claveAdminValida(clave) {
+  var configurada = PropertiesService.getScriptProperties().getProperty(PROPIEDAD_CLAVE_ADMIN)
+  if (!configurada) return 'sin_configurar'
+
+  var cache = CacheService.getScriptCache()
+  var fallidos = Number(cache.get('admin_fallidos') || 0)
+  if (fallidos >= INTENTOS_ADMIN) return 'bloqueado'
+
+  if (String(clave || '') !== configurada) {
+    cache.put('admin_fallidos', String(fallidos + 1), 15 * 60)
+    return 'incorrecta'
+  }
+
+  cache.remove('admin_fallidos')
+  return 'ok'
+}
+
+function rechazoAdmin(estado) {
+  if (estado === 'sin_configurar') {
+    return rechazo('clave_admin', 'Falta configurar la clave de administrador (CLAVE_ADMIN) en el script.')
+  }
+  if (estado === 'bloqueado') {
+    return rechazo('clave_admin', 'Demasiados intentos. Esperá 15 minutos y volvé a probar.')
+  }
+  return rechazo('clave_admin', 'La clave de administrador no es correcta.')
+}
+
+function fechaLegible(valor) {
+  return esFecha(valor) ? Utilities.formatDate(valor, ZONA_HORARIA, 'dd/MM/yyyy') : ''
+}
+
+function horaLegible(valor) {
+  return esFecha(valor) ? Utilities.formatDate(valor, ZONA_HORARIA, 'HH:mm') : ''
+}
+
+/** Todo lo que muestra el panel de administrador. */
+function datosAdmin(datos) {
+  var estado = claveAdminValida(datos.clave)
+  if (estado !== 'ok') return rechazoAdmin(estado)
+
+  var usuarios = leerCuentas().map(function (fila) {
+    var usuario = usuarioPublico(fila)
+    usuario.tipo = String(fila.tipo)
+    usuario.fecha = fechaLegible(fila.fecha)
+    usuario.hora = horaLegible(fila.hora)
+    usuario.correoConfirmacion = String(fila.correoConfirmacion)
+    return usuario
+  })
+
+  var publicaciones = leerFilas(obtenerHoja(HOJA_PUBLICACIONES, COLUMNAS_PUBLICACIONES), COLUMNAS_PUBLICACIONES).map(
+    function (fila) {
+      return {
+        id: String(fila.id),
+        titulo: String(fila.titulo),
+        materialId: String(fila.materialId),
+        cantidad: Number(fila.cantidad) || 0,
+        unidad: String(fila.unidad),
+        zona: String(fila.zona),
+        empresa: String(fila.empresa),
+        contacto: String(fila.contacto),
+        telefono: normalizarTelefono(fila.telefono),
+        estado: String(fila.estado),
+        contactos: Number(fila.contactos) || 0,
+        creadaEn: formatearMarcaTemporal(fila.creadaEn),
+        fecha: fechaLegible(fila.fecha),
+        hora: horaLegible(fila.hora),
+      }
+    },
+  )
+
+  var contactos = leerFilas(obtenerHoja(HOJA_CONTACTOS, COLUMNAS_CONTACTOS), COLUMNAS_CONTACTOS).map(
+    function (fila) {
+      return {
+        fecha: fechaLegible(fila.fecha),
+        hora: horaLegible(fila.hora),
+        creadoEn: formatearMarcaTemporal(fila.fecha),
+        titulo: String(fila.titulo),
+        publicacionId: String(fila.publicacionId),
+        empresa: String(fila.empresa),
+        contacto: String(fila.contacto),
+        tipo: String(fila.tipo),
+      }
+    },
+  )
+
+  return respuesta({
+    ok: true,
+    urlHoja: SpreadsheetApp.getActiveSpreadsheet().getUrl(),
+    correosRestantesHoy: MailApp.getRemainingDailyQuota(),
+    usuarios: usuarios,
+    publicaciones: publicaciones,
+    contactos: contactos,
+  })
+}
+
+/** Pausar, activar o eliminar cualquier publicación desde el panel. */
+function publicacionAdmin(datos) {
+  var estado = claveAdminValida(datos.clave)
+  if (estado !== 'ok') return rechazoAdmin(estado)
+
+  var hoja = obtenerHoja(HOJA_PUBLICACIONES, COLUMNAS_PUBLICACIONES)
+  var existente = buscar(leerFilas(hoja, COLUMNAS_PUBLICACIONES), 'id', datos.id)
+  if (!existente) return rechazo('no_existe', 'La publicación ya no existe.')
+
+  if (datos.eliminar) {
+    hoja.deleteRow(existente._fila)
+  } else if (ESTADOS.indexOf(datos.estado) !== -1) {
+    hoja.getRange(existente._fila, COLUMNAS_PUBLICACIONES.indexOf('estado') + 1).setValue(datos.estado)
+  } else {
+    return rechazo('datos_invalidos', 'El estado no es válido.')
+  }
+
+  return respuesta({ ok: true })
+}
+
 // ================================================================== entrada
 
 /** Acciones que exigen una sesión válida. Reciben el usuarioId y los datos. */
@@ -809,6 +1311,8 @@ function doPost(e) {
     if (accion === 'restablecer_clave') return restablecerClave(datos)
     if (accion === 'cerrar_sesion') return cerrarSesion(token)
     if (accion === 'registrar_contacto') return registrarContacto(validarSesion(token), datos)
+    if (accion === 'admin_datos') return datosAdmin(datos)
+    if (accion === 'admin_publicacion') return publicacionAdmin(datos)
 
     var manejador = ACCIONES_CON_SESION[accion]
     if (!manejador) return rechazo('accion_desconocida', 'Acción no reconocida: ' + accion)
@@ -831,6 +1335,7 @@ function doGet(e) {
     var accion = (e && e.parameter && e.parameter.accion) || 'listar_publicaciones'
 
     if (accion === 'listar_publicaciones') return listarPublicaciones()
+    if (accion === 'estado') return respuesta({ ok: true, version: 3 })
 
     return rechazo('accion_desconocida', 'Acción no reconocida: ' + accion)
   } catch (error) {
@@ -844,6 +1349,9 @@ function listarPublicaciones() {
     COLUMNAS_PUBLICACIONES,
   ).map(function (publicacion) {
     delete publicacion._fila
+    // La web usa creadaEn; fecha y hora son solo para leer la hoja.
+    delete publicacion.fecha
+    delete publicacion.hora
 
     // Normaliza los tipos que la hoja devuelve.
     //

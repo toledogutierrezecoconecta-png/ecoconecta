@@ -7,7 +7,14 @@ import { cargarScript } from './simulador.mjs'
 const CODIGO = process.argv[2]
 const PUERTO = Number(process.argv[3] ?? 8787)
 
-let script = cargarScript(CODIGO, libroComoElReal())
+/** Hoja simulada ya convertida con actualizarHojas, como queda la real al instalar. */
+function nuevaHoja() {
+  const script = cargarScript(CODIGO, libroComoElReal(), { CLAVE_ADMIN: 'admin-local' })
+  script.ejecutar('actualizarHojas')
+  return script
+}
+
+let script = nuevaHoja()
 
 const cabeceras = {
   'Access-Control-Allow-Origin': '*',
@@ -31,7 +38,7 @@ http
         // Los correos que el script "envió" (nada sale a internet).
         salida = JSON.stringify(script.correos)
       } else if (url.pathname === '/__reiniciar') {
-        script = cargarScript(CODIGO, libroComoElReal())
+        script = nuevaHoja()
         salida = JSON.stringify({ ok: true })
       } else {
         salida = '<!doctype html><title>Hoja local</title><p>Hoja simulada de EcoConecta: POST/GET en /exec.</p>'
@@ -43,4 +50,6 @@ http
       respuesta.end(salida)
     })
   })
-  .listen(PUERTO, () => console.log(`Hoja simulada escuchando en http://localhost:${PUERTO}`))
+  .listen(PUERTO, () =>
+    console.log(`Hoja simulada en http://localhost:${PUERTO}/exec (clave de administrador local: admin-local)`),
+  )

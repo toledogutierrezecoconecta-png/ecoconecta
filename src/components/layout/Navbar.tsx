@@ -6,6 +6,7 @@ import { puedePublicar } from '../../utils/roles'
 import { clasesBoton } from '../ui/Boton'
 import { Icono } from '../ui/Icono'
 import logo from '../../assets/marca/logo.webp'
+import { EVENTO_ADMIN, hayAdminActivo } from '../../services/admin'
 
 interface Enlace {
   a: string
@@ -40,6 +41,14 @@ export function Navbar() {
   const [desplazado, setDesplazado] = useState(false)
   const ubicacion = useLocation()
   const navegar = useNavigate()
+  const [esAdmin, setEsAdmin] = useState(hayAdminActivo)
+
+  // El enlace "Admin" solo aparece en el navegador donde se ingresó la clave.
+  useEffect(() => {
+    const actualizar = () => setEsAdmin(hayAdminActivo())
+    window.addEventListener(EVENTO_ADMIN, actualizar)
+    return () => window.removeEventListener(EVENTO_ADMIN, actualizar)
+  }, [])
 
   // En la portada el menú estorba la ilustración, así que arranca escondido y
   // aparece apenas se baja. Al volver al tope vuelve a esconderse.
@@ -65,7 +74,10 @@ export function Navbar() {
   // Con el menú desplegado nunca se esconde: dejaría las opciones inalcanzables.
   const escondido = esPortada && !desplazado && !abierto
 
-  const enlaces = usuario ? enlacesPrivados(usuario.tipo) : PUBLICOS
+  const enlaces = [
+    ...(usuario ? enlacesPrivados(usuario.tipo) : PUBLICOS),
+    ...(esAdmin ? [{ a: '/admin', texto: 'Admin' }] : []),
+  ]
 
   // Primero se sale de la página: si se cierra la sesión estando en una
   // página privada, esa página redirige al ingreso antes de llegar al inicio.

@@ -259,17 +259,24 @@ export function Explorar() {
               </span>
 
               <h2 className="mt-5 text-lg font-bold text-humo-800">
-                No encontramos materiales con esos filtros
+                {publicaciones.length === 0
+                  ? 'Todavía no hay materiales publicados'
+                  : 'No encontramos materiales con esos filtros'}
               </h2>
               <p className="mx-auto mt-2 max-w-sm text-sm text-humo-600">
-                Probá ampliando la zona o quitando algún filtro. ¿Buscás un material que nadie
-                ofrece todavía? Contanos qué necesitás y te ayudamos a encontrar quién lo genera.
+                {publicaciones.length === 0
+                  ? 'EcoConecta SCZ recién empieza. ¿Tu negocio genera residuos? Publicalos y los recolectores te van a encontrar.'
+                  : 'Probá ampliando la zona o quitando algún filtro.'}{' '}
+                ¿Buscás un material que nadie ofrece todavía? Contanos qué necesitás y te ayudamos a
+                encontrar quién lo genera.
               </p>
 
               <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
-                <Boton variante="contorno" onClick={limpiar}>
-                  Limpiar filtros
-                </Boton>
+                {publicaciones.length > 0 && (
+                  <Boton variante="contorno" onClick={limpiar}>
+                    Limpiar filtros
+                  </Boton>
+                )}
                 <a
                   href={`https://wa.me/${WHATSAPP_SOPORTE}?text=${encodeURIComponent(
                     'Hola EcoConecta SCZ, estoy buscando este material: ',

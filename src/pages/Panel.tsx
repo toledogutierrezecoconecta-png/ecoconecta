@@ -215,9 +215,9 @@ function PanelOferente({ mias, pendientes, cambiarEstado, eliminar }: PropsOfere
         </section>
       )}
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         {tarjetas.map((tarjeta) => (
-          <div key={tarjeta.etiqueta} className="rounded-2xl border border-humo-200 bg-white p-5">
+          <div key={tarjeta.etiqueta} className="rounded-2xl border border-humo-200 bg-white p-4 sm:p-5">
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-marca-50 text-marca-600">
               <Icono nombre={tarjeta.icono} className="h-5 w-5" />
             </span>

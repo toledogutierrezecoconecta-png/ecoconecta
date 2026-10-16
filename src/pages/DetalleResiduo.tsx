@@ -92,8 +92,10 @@ export function DetalleResiduo() {
     { icono: 'reciclaje' as const, etiqueta: 'Categoría', valor: categoria?.nombre ?? '—' },
   ]
 
+  const puedeContactar = !esPropia && !esEjemplo && publicacion.estado === 'disponible'
+
   return (
-    <div className="contenedor py-6 md:py-10">
+    <div className={`contenedor py-6 md:py-10 ${puedeContactar ? 'pb-28 lg:pb-10' : ''}`}>
       <button
         type="button"
         // Si se entró directo (por un enlace de WhatsApp), "atrás" saldría del
@@ -276,6 +278,24 @@ export function DetalleResiduo() {
         </aside>
       </div>
 
+
+      {/* En el celular el botón de contacto queda muy abajo: se repite fijo al pie. */}
+      {puedeContactar && (
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-humo-200 bg-white/95 px-4 py-3 backdrop-blur lg:hidden">
+          <div className="mx-auto flex max-w-lg items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-bold text-humo-800">{publicacion.empresa}</p>
+              <p className="truncate text-xs text-humo-500">
+                {formatearCantidad(publicacion.cantidad, publicacion.unidad)} · {publicacion.zona}
+              </p>
+            </div>
+            <Boton tamano="lg" onClick={abrirContacto}>
+              <Icono nombre="telefono" className="h-5 w-5" />
+              Contactar
+            </Boton>
+          </div>
+        </div>
+      )}
       <Modal
         abierto={modalAbierto}
         titulo={`Contactar a ${publicacion.empresa}`}

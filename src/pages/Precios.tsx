@@ -118,7 +118,7 @@ export function Precios() {
 
             <Etiqueta tono="ambar">
               <Icono nombre="alerta" className="h-3.5 w-3.5" />
-              Valores de demostración
+              Valores referenciales
             </Etiqueta>
           </div>
 
