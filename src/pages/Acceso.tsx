@@ -1,15 +1,20 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Boton } from '../components/ui/Boton'
-import { CampoTexto } from '../components/ui/Campo'
+import { CampoArea, CampoSelect, CampoTexto } from '../components/ui/Campo'
 import { Icono } from '../components/ui/Icono'
-import { TIPOS_USUARIO } from '../data/catalogos'
+import { TIPOS_USUARIO, ZONAS } from '../data/catalogos'
 import { useAuth } from '../hooks/useAuth'
 import { consumirAvisoSesionVencida } from '../services/sesion'
 import type { TipoUsuario } from '../types'
 import simbolo from '../assets/marca/simbolo.webp'
 
 type Modo = 'ingreso' | 'registro'
+
+/** Fecha de hoy en Bolivia, "yyyy-MM-dd": mínimo para la fecha estimada. */
+function hoyEnBolivia(): string {
+  return new Date(Date.now() - 4 * 3600000).toISOString().slice(0, 10)
+}
 
 export function Acceso() {
   const [parametros] = useSearchParams()
@@ -25,6 +30,11 @@ export function Acceso() {
     telefono: '',
     correo: '',
     clave: '',
+    zona: '',
+    fecha: '',
+    mensaje: '',
+    // Campo trampa: las personas no lo ven; si llega con texto, es un robot.
+    website: '',
   })
   // Al llegar desde "Guardar" o "Contactar" se vuelve a esa página después de
   // ingresar. Solo se aceptan rutas internas, nunca una dirección externa.
@@ -53,6 +63,8 @@ export function Acceso() {
 
     try {
       if (modo === 'registro') {
+        // Un robot llenó el campo invisible: no se envía nada.
+        if (formulario.website) throw new Error('No se pudo completar el registro.')
         await registrar({ ...formulario, tipo })
       } else {
         await iniciarSesion(formulario.correo, formulario.clave)
@@ -215,6 +227,67 @@ export function Acceso() {
                 ))}
               </div>
             </fieldset>
+          )}
+
+          {modo === 'registro' && (
+            <>
+              <CampoSelect
+                etiqueta="Lugar: zona donde operás"
+                value={formulario.zona}
+                onChange={(evento) => cambiar('zona', evento.target.value)}
+                required
+              >
+                <option value="" disabled>
+                  Elegí tu zona
+                </option>
+                {ZONAS.map((zona) => (
+                  <option key={zona} value={zona}>
+                    {zona}
+                  </option>
+                ))}
+              </CampoSelect>
+
+              <CampoTexto
+                etiqueta={
+                  tipo === 'recolector'
+                    ? 'Fecha estimada de tu primera recolección'
+                    : 'Fecha estimada de tu primera entrega de material'
+                }
+                type="date"
+                min={hoyEnBolivia()}
+                value={formulario.fecha}
+                onChange={(evento) => cambiar('fecha', evento.target.value)}
+                required
+              />
+
+              <CampoArea
+                etiqueta={
+                  tipo === 'recolector'
+                    ? 'Mensaje: ¿qué materiales buscás?'
+                    : tipo === 'ambos'
+                      ? 'Mensaje: ¿qué materiales generás y cuáles buscás?'
+                      : 'Mensaje: ¿qué materiales genera tu negocio?'
+                }
+                placeholder="Ej: aceite de cocina usado, unos 40 litros por semana"
+                rows={3}
+                maxLength={500}
+                value={formulario.mensaje}
+                onChange={(evento) => cambiar('mensaje', evento.target.value)}
+                required
+              />
+
+              {/* Honeypot: fuera de la vista y del teclado; solo un robot lo completa. */}
+              <input
+                type="text"
+                name="website"
+                tabIndex={-1}
+                autoComplete="off"
+                aria-hidden="true"
+                value={formulario.website}
+                onChange={(evento) => cambiar('website', evento.target.value)}
+                style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, opacity: 0 }}
+              />
+            </>
           )}
 
           {error && (

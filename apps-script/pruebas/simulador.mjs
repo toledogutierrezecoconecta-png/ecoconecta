@@ -53,6 +53,14 @@ class Rango {
   setFontWeight() {
     return this
   }
+  /** La fórmula se guarda tal cual (no se calcula): las pruebas revisan el texto. */
+  setFormula(formula) {
+    this.hoja.formulas[`${this.fila},${this.columna}`] = formula
+    return this
+  }
+  getFormula() {
+    return this.hoja.formulas[`${this.fila},${this.columna}`] ?? ''
+  }
   /** Nota al pasar el mouse por la celda. */
   setNote(nota) {
     this.hoja.notas[`${this.fila},${this.columna}`] = nota
@@ -67,6 +75,7 @@ class Hoja {
     this.datos = []
     this.formatos = {}
     this.notas = {}
+    this.formulas = {}
     this.columnasOcultas = new Set()
     this.oculta = false
   }
@@ -89,6 +98,27 @@ class Hoja {
     this.oculta = true
     return this
   }
+  getMaxColumns() {
+    return 26
+  }
+  showColumns() {
+    this.columnasOcultas.clear()
+  }
+  /** Borra contenido, formatos, notas y fórmulas. */
+  clear() {
+    this.datos = []
+    this.formatos = {}
+    this.notas = {}
+    this.formulas = {}
+    return this
+  }
+  /** Copia la pestaña a otro libro, como "Copia de …". */
+  copyTo(destino) {
+    const copia = destino.insertSheet(`Copia de ${this.nombre}`)
+    copia.datos = this.datos.map((fila) => [...fila])
+    copia.formatos = { ...this.formatos }
+    return copia
+  }
   getLastRow() {
     return this.datos.length
   }
@@ -109,10 +139,21 @@ class Hoja {
 }
 
 export class Libro {
-  constructor() {
+  constructor(id = 'libro-compartido') {
+    this.id = id
     this.hojas = new Map()
     this.orden = []
     this.zonaHoraria = 'UTC'
+  }
+  getId() {
+    return this.id
+  }
+  getSheets() {
+    return [...this.orden]
+  }
+  deleteSheet(hoja) {
+    this.hojas.delete(hoja.nombre)
+    this.orden = this.orden.filter((otra) => otra !== hoja)
   }
   setSpreadsheetTimeZone(zona) {
     this.zonaHoraria = zona
@@ -140,7 +181,7 @@ export class Libro {
     return hoja
   }
   getUrl() {
-    return 'https://docs.google.com/spreadsheets/d/simulada'
+    return `https://docs.google.com/spreadsheets/d/${this.id}`
   }
   /** Estado legible para las pruebas. */
   volcar() {
@@ -167,7 +208,7 @@ function formatearFecha(fecha, zona, formato) {
     .replace('mm', partes.minute)
 }
 
-export function cargarScript(rutaCodigo, libro = new Libro(), propiedades = {}) {
+export function cargarScript(rutaCodigo, libro = new Libro(), propiedades = {}, otrosLibros = {}) {
   /** Correos que el script "envió". No sale nada a internet. */
   const correos = []
   const cache = new Map()
@@ -178,7 +219,19 @@ export function cargarScript(rutaCodigo, libro = new Libro(), propiedades = {}) 
       getRemainingDailyQuota: () => 100,
     },
     Session: { getEffectiveUser: () => ({ getEmail: () => 'duenio@ejemplo.test' }) },
-    SpreadsheetApp: { getActiveSpreadsheet: () => libro },
+    SpreadsheetApp: {
+      getActiveSpreadsheet: () => libro,
+      openById: (id) => {
+        if (!otrosLibros[id]) throw new Error('No se encontró la hoja ' + id)
+        return otrosLibros[id]
+      },
+      create: (nombre) => {
+        const nuevo = new Libro(`libro-${Object.keys(otrosLibros).length + 1}`)
+        nuevo.nombre = nombre
+        otrosLibros[nuevo.id] = nuevo
+        return nuevo
+      },
+    },
     ContentService: {
       MimeType: { JSON: 'application/json' },
       createTextOutput: (contenido) => ({
@@ -235,5 +288,7 @@ export function cargarScript(rutaCodigo, libro = new Libro(), propiedades = {}) 
     /** Ejecuta una función del script, como el botón Ejecutar del editor. */
     ejecutar: (funcion) => contexto[funcion](),
     propiedades,
+    /** El archivo privado que creó el script (null si todavía no existe). */
+    privado: () => otrosLibros[propiedades.LIBRO_PRIVADO_ID] ?? null,
   }
 }

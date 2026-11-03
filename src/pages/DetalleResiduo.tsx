@@ -11,6 +11,8 @@ import { buscarCategoria, buscarMaterial } from '../data/catalogos'
 import { VIGENCIA_PRECIOS, buscarPrecio } from '../data/precios'
 import { useActividad } from '../hooks/useActividad'
 import { useAuth } from '../hooks/useAuth'
+import { obtenerDatosContacto } from '../services/sheets'
+import type { DatosContacto } from '../services/sheets'
 import { usePublicaciones } from '../hooks/usePublicaciones'
 import {
   enlaceLlamada,
@@ -31,6 +33,9 @@ export function DetalleResiduo() {
   const { publicaciones, cargando, contactar } = usePublicaciones()
   const { anotarContacto } = useActividad()
   const [modalAbierto, setModalAbierto] = useState(false)
+  // Teléfono y persona de contacto: se piden al servidor al tocar "Contactar".
+  const [contacto, setContacto] = useState<(DatosContacto & { id: string }) | null>(null)
+  const [estadoContacto, setEstadoContacto] = useState<{ id: string; error: string } | null>(null)
 
   const publicacion = publicaciones.find((item) => item.id === id)
 
@@ -66,7 +71,32 @@ export function DetalleResiduo() {
   const precioReferencia = buscarPrecio(publicacion.materialId)
   const valor = valorDePublicacion(publicacion)
 
-  const abrirContacto = () => setModalAbierto(true)
+  // Solo vale el contacto de ESTA publicación (al navegar a otra, se vuelve a pedir).
+  const datosContacto = contacto?.id === publicacion.id ? contacto : null
+  const pidiendoContacto = estadoContacto?.id === publicacion.id && !estadoContacto.error
+  const errorContacto = estadoContacto?.id === publicacion.id ? estadoContacto.error : ''
+  const conContacto = datosContacto ? { ...publicacion, ...datosContacto } : null
+
+  const pedirContacto = () => {
+    const pedidoPara = publicacion.id
+    setEstadoContacto({ id: pedidoPara, error: '' })
+    obtenerDatosContacto(pedidoPara)
+      .then((datos) => {
+        setContacto({ ...datos, id: pedidoPara })
+        setEstadoContacto(null)
+      })
+      .catch((problema: unknown) =>
+        setEstadoContacto({
+          id: pedidoPara,
+          error: problema instanceof Error ? problema.message : 'No se pudieron obtener los datos de contacto.',
+        }),
+      )
+  }
+
+  const abrirContacto = () => {
+    setModalAbierto(true)
+    if (!datosContacto && !pidiendoContacto) pedirContacto()
+  }
 
   // La consulta se registra al tocar WhatsApp o Llamar, no al abrir la ventana:
   // así cuenta solo a quien realmente fue a contactar. Cada persona suma una vez.
@@ -227,7 +257,9 @@ export function DetalleResiduo() {
                 </span>
                 <div className="min-w-0">
                   <p className="truncate font-bold text-humo-800">{publicacion.empresa}</p>
-                  <p className="truncate text-sm text-humo-500">{publicacion.contacto}</p>
+                  {datosContacto?.contacto && (
+                    <p className="truncate text-sm text-humo-500">{datosContacto.contacto}</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -313,9 +345,25 @@ export function DetalleResiduo() {
         descripcion="Elegí cómo contactarlo para coordinar el retiro y acordar las condiciones."
         onCerrar={() => setModalAbierto(false)}
       >
+        {!conContacto ? (
+          errorContacto ? (
+            <div className="rounded-xl bg-red-50 p-4 text-sm text-red-700" role="alert">
+              <p className="font-semibold">{errorContacto}</p>
+              <Boton variante="contorno" tamano="sm" className="mt-3" onClick={pedirContacto}>
+                Intentar de nuevo
+              </Boton>
+            </div>
+          ) : (
+            <div className="space-y-3" aria-busy="true">
+              <p className="text-sm text-humo-500">Buscando los datos de contacto…</p>
+              <div className="h-[74px] animate-pulse rounded-xl bg-humo-100" />
+              <div className="h-[74px] animate-pulse rounded-xl bg-humo-100" />
+            </div>
+          )
+        ) : (
         <div className="space-y-3">
           <a
-            href={enlaceWhatsApp(publicacion, usuario)}
+            href={enlaceWhatsApp(conContacto, usuario)}
             target="_blank"
             rel="noreferrer"
             onClick={() => registrarConsulta('whatsapp')}
@@ -336,7 +384,7 @@ export function DetalleResiduo() {
           </a>
 
           <a
-            href={enlaceLlamada(publicacion.telefono)}
+            href={enlaceLlamada(conContacto.telefono)}
             onClick={() => registrarConsulta('llamada')}
             className="flex items-center gap-3 rounded-xl border border-humo-200 p-4 transition-colors hover:border-marca-400 hover:bg-marca-50"
           >
@@ -345,11 +393,12 @@ export function DetalleResiduo() {
             </span>
             <span className="flex-1">
               <span className="block font-bold text-humo-800">Llamar</span>
-              <span className="block text-sm text-humo-500">+591 {publicacion.telefono}</span>
+              <span className="block text-sm text-humo-500">+591 {conContacto.telefono}</span>
             </span>
             <Icono nombre="flecha" className="h-5 w-5 text-humo-400" />
           </a>
         </div>
+        )}
 
         <p className="mt-4 rounded-xl bg-marca-50 px-4 py-3 text-xs text-marca-800">
           {usuario

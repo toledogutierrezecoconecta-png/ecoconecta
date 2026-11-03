@@ -396,7 +396,7 @@ function Tabla({ titulos, vacio, children }: { titulos: string[]; vacio: boolean
 function TablaUsuarios({ usuarios }: { usuarios: UsuarioAdmin[] }) {
   return (
     <Tabla
-      titulos={['Fecha', 'Empresa / negocio', 'Contacto', 'Teléfono', 'Correo', 'Confirmación']}
+      titulos={['Registro', 'Empresa / negocio', 'Contacto', 'Lugar y fecha', 'Mensaje', 'Confirmación']}
       vacio={usuarios.length === 0}
     >
       {usuarios.map((usuario) => (
@@ -406,22 +406,27 @@ function TablaUsuarios({ usuarios }: { usuarios: UsuarioAdmin[] }) {
             <span className="block text-xs text-humo-400">{usuario.hora}</span>
           </td>
           <td className="px-4 py-3 font-semibold text-humo-800">{usuario.empresa}</td>
-          <td className="px-4 py-3 text-humo-700">{usuario.contacto}</td>
-          <td className="px-4 py-3 whitespace-nowrap">
+          <td className="px-4 py-3 text-humo-700">
+            {usuario.contacto}
             <a
               href={enlaceWhatsAppDirecto(usuario.telefono)}
               target="_blank"
               rel="noreferrer"
-              className="font-semibold text-marca-700 hover:underline"
+              className="block text-xs font-semibold text-marca-700 hover:underline"
             >
               {usuario.telefono}
             </a>
-          </td>
-          <td className="px-4 py-3">
-            <a href={`mailto:${usuario.correo}`} className="break-all text-marca-700 hover:underline">
+            <a href={`mailto:${usuario.correo}`} className="block text-xs break-all text-marca-700 hover:underline">
               {usuario.correo}
             </a>
           </td>
+          <td className="px-4 py-3 whitespace-nowrap text-humo-700">
+            {usuario.lugar || '—'}
+            {usuario.fechaServicio && (
+              <span className="block text-xs text-humo-500">desde {usuario.fechaServicio}</span>
+            )}
+          </td>
+          <td className="max-w-xs px-4 py-3 text-humo-600">{usuario.mensaje || '—'}</td>
           <td className="px-4 py-3 text-humo-600">{usuario.correoConfirmacion}</td>
         </tr>
       ))}
@@ -697,9 +702,9 @@ function exportar(datos: DatosAdmin, seccion: Seccion): void {
 
   const nombre = SECCIONES.find((opcion) => opcion.valor === seccion)?.texto.toLowerCase() ?? 'usuarios'
   descargarCsv(`ecoconecta-${nombre}-${hoy}.csv`, [
-    ['Fecha', 'Hora', 'Empresa / negocio', 'Contacto', 'Teléfono', 'Correo', 'Confirmación'],
+    ['Fecha', 'Hora', 'Nombre', 'Email', 'Tipo', 'Lugar', 'Fecha estimada', 'Mensaje', 'Empresa / negocio', 'Teléfono', 'Confirmación'],
     ...usuariosDe(datos, seccion).map((u) => [
-      u.fecha, u.hora, u.empresa, u.contacto, u.telefono, u.correo, u.correoConfirmacion,
+      u.fecha, u.hora, u.contacto, u.correo, u.tipo, u.lugar, u.fechaServicio, u.mensaje, u.empresa, u.telefono, u.correoConfirmacion,
     ]),
   ])
 }

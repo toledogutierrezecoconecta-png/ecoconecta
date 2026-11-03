@@ -127,4 +127,12 @@ export interface CredencialesRegistro {
   correo: string
   clave: string
   tipo: TipoUsuario
+  /** Lugar: zona (distrito) donde opera. */
+  zona: string
+  /** Fecha estimada de la primera entrega o recolección, "yyyy-MM-dd". */
+  fecha: string
+  /** Qué materiales genera o busca. */
+  mensaje: string
+  /** Campo trampa (honeypot): invisible; solo un robot lo llena. */
+  website?: string
 }

@@ -18,13 +18,21 @@
  *   - Fecha y hora de Bolivia, legibles, en cada registro, publicación y contacto.
  *   - Panel de administrador en la web, protegido con la clave CLAVE_ADMIN.
  *
- * Hojas que usa (se crean solas, y si les faltan columnas se agregan al final):
+ * Hoja compartida (la que se entrega; se crean solas las pestañas que falten):
  *
- *   Empresas, Recolectores, Ambos   cuentas, separadas por tipo de usuario
+ *   Respuestas   todas las cuentas: Marca temporal | Nombre | Email | Tipo |
+ *                Lugar | Fecha | Mensaje | y las columnas propias del proyecto
+ *   Empresas, Recolectores, Ambos   vistas automáticas de Respuestas por tipo
+ *                                   (fórmula FILTER: no se escribe en ellas)
  *   Publicaciones
- *   Consultas   cada vez que alguien tomó el WhatsApp o el teléfono de una
- *               publicación para contactar a quien la publicó
- *   Sesiones, Guardados, Recuperaciones   (técnicas: quedan ocultas)
+ *   Consultas    cada vez que alguien tomó el WhatsApp o el teléfono de una
+ *                publicación para contactar a quien la publicó
+ *
+ * Archivo privado "EcoConecta SCZ – Datos privados (NO compartir)", que el
+ * script crea en el Drive de la cuenta dueña y nunca se comparte:
+ *
+ *   Credenciales (hash y sal de las contraseñas), Sesiones, Guardados,
+ *   Recuperaciones y los respaldos de versiones anteriores.
  *
  * INSTALACIÓN: ver README.md, sección "Conectar con Google Sheets". Al pasar de
  * una versión anterior hay que ejecutar UNA vez la función actualizarHojas.
@@ -38,14 +46,32 @@ var HOJA_CONTACTOS = 'Contactos'
 var HOJA_SESIONES = 'Sesiones'
 var HOJA_GUARDADOS = 'Guardados'
 
-/** Cada tipo de cuenta vive en su propia pestaña. */
+/** Pestaña principal de cuentas: la que pide la guía del profesor. */
+var HOJA_RESPUESTAS = 'Respuestas'
+
+/** Vista automática de Respuestas para cada tipo de cuenta. */
 var HOJA_POR_TIPO = { oferente: 'Empresas', recolector: 'Recolectores', ambos: 'Ambos' }
 
 /**
  * Las columnas se leen por posición: el orden de estas listas es el orden de
- * la hoja. Fecha y Hora van primero para que la hoja se lea de un vistazo.
+ * la hoja. De A a G, los 7 títulos de la guía; desde H, los del proyecto.
  */
-var COLUMNAS_USUARIOS = [
+var COLUMNAS_RESPUESTAS = [
+  'marcaTemporal',
+  'nombre',
+  'email',
+  'tipo',
+  'lugar',
+  'fechaServicio',
+  'mensaje',
+  'empresa',
+  'telefono',
+  'correoConfirmacion',
+  'id',
+]
+
+/** Columnas de las pestañas por tipo en la versión del 17/10 (antes de Respuestas). */
+var CUENTAS_17_OCTUBRE = [
   'fecha',
   'hora',
   'empresa',
@@ -60,6 +86,10 @@ var COLUMNAS_USUARIOS = [
   'hashClave',
   'sal',
 ]
+
+/** Contraseñas (hash con sal), en el archivo privado. Una fila por cuenta. */
+var HOJA_CREDENCIALES = 'Credenciales'
+var COLUMNAS_CREDENCIALES = ['usuarioId', 'hashClave', 'sal']
 
 /** Lo que se le devuelve a la web: nunca el hash ni la sal. */
 var CAMPOS_PUBLICOS_USUARIO = [
@@ -137,8 +167,12 @@ var COLUMNAS_GUARDADOS = ['usuarioId', 'publicacionId', 'fecha']
 var HOJA_RECUPERACIONES = 'Recuperaciones'
 var COLUMNAS_RECUPERACIONES = ['correo', 'hashCodigo', 'sal', 'creadoEn', 'expiraEn', 'intentos', 'usado']
 
-/** Pestañas que solo usa el script: se ocultan para que la hoja se lea mejor. */
-var HOJAS_TECNICAS = [HOJA_SESIONES, HOJA_GUARDADOS, HOJA_RECUPERACIONES]
+/** Pestañas que viven en el archivo privado, nunca en la hoja compartida. */
+var HOJAS_PRIVADAS = [HOJA_CREDENCIALES, HOJA_SESIONES, HOJA_GUARDADOS, HOJA_RECUPERACIONES]
+
+/** Nombre del archivo privado y propiedad donde se guarda su id. */
+var NOMBRE_LIBRO_PRIVADO = 'EcoConecta SCZ – Datos privados (NO compartir)'
+var PROPIEDAD_LIBRO_PRIVADO = 'LIBRO_PRIVADO_ID'
 
 /**
  * Títulos que se ven en la fila 1. Las columnas sin título acá muestran su
@@ -146,6 +180,12 @@ var HOJAS_TECNICAS = [HOJA_SESIONES, HOJA_GUARDADOS, HOJA_RECUPERACIONES]
  * hoja sin romper nada, porque el script lee por posición.
  */
 var TITULOS = {
+  marcaTemporal: 'Marca temporal',
+  nombre: 'Nombre',
+  email: 'Email',
+  lugar: 'Lugar',
+  fechaServicio: 'Fecha',
+  mensaje: 'Mensaje',
   fecha: 'Fecha',
   hora: 'Hora',
   empresa: 'Empresa / negocio',
@@ -193,6 +233,13 @@ var TITULOS_ANTERIORES = { contactos: 'Contactos recibidos' }
 
 /** Explicación que aparece al pasar el mouse por el título de la columna. */
 var NOTAS = {
+  marcaTemporal: 'Fecha y hora del registro, en hora de Bolivia.',
+  nombre: 'Persona de contacto de la cuenta.',
+  tipo: 'oferente (genera residuos), recolector (los busca) o ambos.',
+  lugar: 'Zona (distrito) de Santa Cruz donde opera.',
+  fechaServicio:
+    'Fecha estimada de la primera entrega (si ofrece material) o recolección (si lo busca), indicada al registrarse.',
+  mensaje: 'Qué materiales genera o busca, en sus palabras.',
   publicacion:
     'Cada fila es una consulta: alguien tocó WhatsApp o Llamar en esta publicación para contactar a quien la publicó.',
   publicadoPor: 'Negocio dueño de la publicación (el que recibe la consulta).',
@@ -205,6 +252,8 @@ var NOTAS = {
 
 /** Formato de cada columna. Teléfonos y textos como texto: así no pierden ceros. */
 var FORMATOS = {
+  marcaTemporal: 'dd/mm/yyyy HH:mm:ss',
+  fechaServicio: 'dd/mm/yyyy',
   fecha: 'dd/mm/yyyy',
   hora: 'HH:mm',
   telefono: '@',
@@ -213,7 +262,7 @@ var FORMATOS = {
 }
 
 /** Columnas que nadie necesita ver: se ocultan (siguen ahí para el script). */
-var COLUMNAS_OCULTAS = ['hashClave', 'sal']
+var COLUMNAS_OCULTAS = []
 
 /** Clave del administrador: Configuración del proyecto → Propiedades de la secuencia de comandos. */
 var PROPIEDAD_CLAVE_ADMIN = 'CLAVE_ADMIN'
@@ -261,7 +310,7 @@ function obtenerHoja(nombre, columnas) {
     throw new Error('Esta función no se ejecuta sola. Elegí "actualizarHojas" en el menú de funciones y tocá Ejecutar.')
   }
 
-  var libro = SpreadsheetApp.getActiveSpreadsheet()
+  var libro = HOJAS_PRIVADAS.indexOf(nombre) !== -1 ? libroPrivado() : SpreadsheetApp.getActiveSpreadsheet()
   var hoja = libro.getSheetByName(nombre)
   var titulos = columnas.map(titulo)
 
@@ -271,7 +320,6 @@ function obtenerHoja(nombre, columnas) {
     hoja.getRange(1, 1, 1, titulos.length).setFontWeight('bold')
     hoja.setFrozenRows(1)
     prepararColumnas(hoja, columnas, 1)
-    if (HOJAS_TECNICAS.indexOf(nombre) !== -1) hoja.hideSheet()
     return hoja
   }
 
@@ -294,6 +342,30 @@ function obtenerHoja(nombre, columnas) {
   }
 
   return hoja
+}
+
+/** Archivo privado abierto en esta ejecución (abrirlo cuesta: se reutiliza). */
+var libroPrivadoAbierto = null
+
+/**
+ * El archivo privado con contraseñas, sesiones y respaldos. Se crea la primera
+ * vez en el Drive de la cuenta dueña del script y su id queda en las
+ * propiedades. Si el id existe pero no se puede abrir, NO se crea otro: eso
+ * dejaría a todos sin contraseña. Se avisa con un error.
+ */
+function libroPrivado() {
+  if (libroPrivadoAbierto) return libroPrivadoAbierto
+
+  var propiedades = PropertiesService.getScriptProperties()
+  var id = propiedades.getProperty(PROPIEDAD_LIBRO_PRIVADO)
+  if (id) {
+    libroPrivadoAbierto = SpreadsheetApp.openById(id)
+    return libroPrivadoAbierto
+  }
+
+  libroPrivadoAbierto = SpreadsheetApp.create(NOMBRE_LIBRO_PRIVADO)
+  propiedades.setProperty(PROPIEDAD_LIBRO_PRIVADO, libroPrivadoAbierto.getId())
+  return libroPrivadoAbierto
 }
 
 function respuesta(objeto) {
@@ -381,34 +453,99 @@ function calcularHash(clave, sal) {
   return Utilities.base64Encode(bytes)
 }
 
-/** Pestaña de un tipo de cuenta. */
-function hojaDeTipo(tipo) {
-  return obtenerHoja(HOJA_POR_TIPO[tipo] || HOJA_POR_TIPO.oferente, COLUMNAS_USUARIOS)
+/** Fecha (con hora de mediodía en Bolivia, para que no cambie de día) a partir de "yyyy-MM-dd". */
+function fechaDeTexto(valor) {
+  if (esFecha(valor)) return valor
+  var coincidencia = /^(\d{4}-\d{2}-\d{2})/.exec(String(valor || ''))
+  return coincidencia ? new Date(coincidencia[1] + 'T12:00:00-04:00') : ''
 }
 
-/** Todas las cuentas de las tres pestañas. Cada fila sabe en qué hoja está (`_hoja`). */
+/** Una fila de Respuestas a partir de una cuenta. */
+function cuentaAFila(cuenta) {
+  return {
+    marcaTemporal: esFecha(cuenta.fecha) ? cuenta.fecha : fechaDesde(cuenta.creadoEn),
+    nombre: cuenta.contacto,
+    email: cuenta.correo,
+    tipo: cuenta.tipo,
+    lugar: cuenta.zonaInteres,
+    fechaServicio: fechaDeTexto(cuenta.fechaServicio),
+    mensaje: cuenta.mensaje,
+    empresa: cuenta.empresa,
+    telefono: normalizarTelefono(cuenta.telefono),
+    correoConfirmacion: cuenta.correoConfirmacion,
+    id: cuenta.id,
+  }
+}
+
+/** Una cuenta a partir de una fila de Respuestas. */
+function filaACuenta(fila) {
+  var marca = fechaDesde(fila.marcaTemporal)
+  return {
+    id: String(fila.id),
+    empresa: String(fila.empresa),
+    contacto: String(fila.nombre),
+    telefono: normalizarTelefono(fila.telefono),
+    correo: String(fila.email).toLowerCase(),
+    tipo: String(fila.tipo),
+    creadoEn: marca.toISOString(),
+    zonaInteres: String(fila.lugar),
+    fechaServicio: fila.fechaServicio === '' ? '' : formatearFecha(fila.fechaServicio),
+    mensaje: String(fila.mensaje),
+    correoConfirmacion: String(fila.correoConfirmacion),
+    fecha: marca,
+    hora: marca,
+    _fila: fila._fila,
+  }
+}
+
+function hojaRespuestas() {
+  return obtenerHoja(HOJA_RESPUESTAS, COLUMNAS_RESPUESTAS)
+}
+
+/** Todas las cuentas (pestaña Respuestas). */
 function leerCuentas() {
-  var cuentas = []
-  Object.keys(HOJA_POR_TIPO).forEach(function (tipo) {
-    var hoja = hojaDeTipo(tipo)
-    leerFilas(hoja, COLUMNAS_USUARIOS).forEach(function (fila) {
-      fila._hoja = hoja
-      cuentas.push(fila)
-    })
-  })
-  return cuentas
+  return leerFilas(hojaRespuestas(), COLUMNAS_RESPUESTAS).map(filaACuenta)
 }
 
 function buscarCuenta(campo, valor) {
   return buscar(leerCuentas(), campo, valor)
 }
 
-/** Agrega una cuenta nueva en la pestaña de su tipo, con fecha y hora de hoy. */
-function agregarCuenta(fila) {
-  var ahora = new Date()
-  if (!fila.fecha) fila.fecha = ahora
-  if (!fila.hora) fila.hora = fila.fecha
-  hojaDeTipo(fila.tipo).appendRow(filaDesdeObjeto(fila, COLUMNAS_USUARIOS))
+/** Agrega una cuenta nueva a Respuestas (con la fecha y hora de ahora si no trae). */
+function agregarCuenta(cuenta) {
+  if (!esFecha(cuenta.fecha) && !cuenta.creadoEn) cuenta.fecha = new Date()
+  hojaRespuestas().appendRow(filaDesdeObjeto(cuentaAFila(cuenta), COLUMNAS_RESPUESTAS))
+}
+
+/** Reescribe la fila de una cuenta que ya está en Respuestas. */
+function guardarCuenta(cuenta) {
+  escribirFila(hojaRespuestas(), cuenta._fila, cuentaAFila(cuenta), COLUMNAS_RESPUESTAS)
+}
+
+// --------------------------------------------- contraseñas (archivo privado)
+
+function hojaCredenciales() {
+  return obtenerHoja(HOJA_CREDENCIALES, COLUMNAS_CREDENCIALES)
+}
+
+/** Hash y sal de una cuenta, o null si todavía no tiene contraseña. */
+function credencialDe(usuarioId) {
+  var fila = buscar(leerFilas(hojaCredenciales(), COLUMNAS_CREDENCIALES), 'usuarioId', usuarioId)
+  return fila && fila.hashClave ? fila : null
+}
+
+/** Guarda (o reemplaza) la contraseña de una cuenta. */
+function guardarCredencial(usuarioId, hashClave, sal) {
+  var hoja = hojaCredenciales()
+  var datos = { usuarioId: String(usuarioId), hashClave: hashClave, sal: sal }
+  var existente = buscar(leerFilas(hoja, COLUMNAS_CREDENCIALES), 'usuarioId', usuarioId)
+  if (existente) escribirFila(hoja, existente._fila, datos, COLUMNAS_CREDENCIALES)
+  else hoja.appendRow(filaDesdeObjeto(datos, COLUMNAS_CREDENCIALES))
+}
+
+function claveCorrecta(usuarioId, clave) {
+  var credencial = credencialDe(usuarioId)
+  return Boolean(credencial) && calcularHash(String(clave || ''), String(credencial.sal)) === String(credencial.hashClave)
 }
 
 function usuarioPublico(fila) {
@@ -469,10 +606,16 @@ function registrarUsuario(datos) {
   var correo = texto(datos.correo, 200).toLowerCase()
   var clave = String(datos.clave || '')
 
+  // Campo trampa: invisible para las personas, solo un robot lo llena.
+  if (texto(datos.website)) return rechazo('datos_invalidos', 'No se pudo completar el registro.')
+
   if (!correoValido(correo)) return rechazo('datos_invalidos', 'El correo no es válido.')
   if (clave.length < 6) return rechazo('datos_invalidos', 'La contraseña debe tener al menos 6 caracteres.')
   var error = validarPerfil(datos)
   if (error) return rechazo('datos_invalidos', error)
+  if (!texto(datos.zona, 30)) return rechazo('datos_invalidos', 'Elegí la zona donde operás.')
+  if (!fechaDeTexto(datos.fecha)) return rechazo('datos_invalidos', 'Indicá una fecha estimada válida.')
+  if (!texto(datos.mensaje, 500)) return rechazo('datos_invalidos', 'Contanos qué materiales generás o buscás.')
 
   if (buscarCuenta('correo', correo)) {
     return rechazo('correo_existente', 'Ya existe una cuenta registrada con ese correo electrónico.')
@@ -490,14 +633,15 @@ function registrarUsuario(datos) {
     correo: correo,
     tipo: datos.tipo,
     creadoEn: ahora.toISOString(),
-    zonaInteres: '',
-    hashClave: calcularHash(clave, sal),
-    sal: sal,
+    zonaInteres: texto(datos.zona, 30),
+    fechaServicio: texto(datos.fecha, 10),
+    mensaje: texto(datos.mensaje, 500),
   }
 
   var correoEnviado = enviarBienvenida(fila)
   fila.correoConfirmacion = correoEnviado ? 'Enviado' : 'No se pudo enviar'
   agregarCuenta(fila)
+  guardarCredencial(fila.id, calcularHash(clave, sal), sal)
 
   return respuesta({
     ok: true,
@@ -514,8 +658,8 @@ function iniciarSesion(datos) {
   if (!fila) return rechazo('no_existe', 'No encontramos una cuenta con ese correo.')
   // Cuenta creada antes de que existieran las contraseñas en la hoja: la web
   // intenta recuperarla con los datos que guardó el navegador.
-  if (!fila.hashClave) return rechazo('cuenta_sin_clave', 'Esta cuenta todavía no tiene contraseña en la hoja.')
-  if (calcularHash(String(datos.clave || ''), String(fila.sal)) !== String(fila.hashClave)) {
+  if (!credencialDe(fila.id)) return rechazo('cuenta_sin_clave', 'Esta cuenta todavía no tiene contraseña en la hoja.')
+  if (!claveCorrecta(fila.id, datos.clave)) {
     return rechazo('credenciales', 'La contraseña no es correcta.')
   }
 
@@ -543,12 +687,10 @@ function reclamarCuenta(datos) {
   var sal = Utilities.getUuid()
 
   if (existente) {
-    if (existente.hashClave) return rechazo('correo_existente', 'Esta cuenta ya tiene contraseña. Iniciá sesión normalmente.')
+    if (credencialDe(existente.id)) return rechazo('correo_existente', 'Esta cuenta ya tiene contraseña. Iniciá sesión normalmente.')
     if (String(existente.id) !== id) return rechazo('no_autorizado', 'No se pudo recuperar la cuenta.')
 
-    existente.hashClave = calcularHash(clave, sal)
-    existente.sal = sal
-    escribirFila(existente._hoja, existente._fila, existente, COLUMNAS_USUARIOS)
+    guardarCredencial(existente.id, calcularHash(clave, sal), sal)
     return entregarSesion(existente)
   }
 
@@ -579,11 +721,10 @@ function reclamarCuenta(datos) {
     tipo: perfil.tipo,
     creadoEn: creadoEn,
     zonaInteres: texto(usuario.zonaInteres, 20),
-    hashClave: calcularHash(clave, sal),
-    sal: sal,
   }
 
   agregarCuenta(fila)
+  guardarCredencial(id, calcularHash(clave, sal), sal)
   return entregarSesion(fila)
 }
 
@@ -734,9 +875,7 @@ function restablecerClave(datos) {
   hoja.getRange(vigente._fila, COLUMNAS_RECUPERACIONES.indexOf('usado') + 1).setValue(true)
 
   var sal = Utilities.getUuid()
-  cuenta.hashClave = calcularHash(clave, sal)
-  cuenta.sal = sal
-  escribirFila(cuenta._hoja, cuenta._fila, cuenta, COLUMNAS_USUARIOS)
+  guardarCredencial(cuenta.id, calcularHash(clave, sal), sal)
 
   // Si alguien más tenía la sesión abierta, deja de servirle.
   cerrarSesionesDe(String(cuenta.id))
@@ -772,13 +911,67 @@ function fechaDesde(valor) {
   return isNaN(fecha.getTime()) ? new Date() : fecha
 }
 
-/** Renombra y oculta una pestaña vieja en lugar de borrarla. */
-function respaldar(hoja, nombre) {
-  var libro = SpreadsheetApp.getActiveSpreadsheet()
+/** Nombre libre en un libro: "Nombre", "Nombre 2", "Nombre 3"… */
+function nombreLibre(libro, nombre) {
   var destino = nombre
   for (var n = 2; libro.getSheetByName(destino); n++) destino = nombre + ' ' + n
-  hoja.setName(destino)
-  hoja.hideSheet()
+  return destino
+}
+
+/**
+ * Copia una pestaña al archivo privado (como respaldo) y la saca de la hoja
+ * compartida. Nada se pierde: queda completa en el archivo privado.
+ */
+function moverAlPrivado(hoja, nombre) {
+  var privado = libroPrivado()
+  var copia = hoja.copyTo(privado)
+  copia.setName(nombreLibre(privado, nombre))
+  SpreadsheetApp.getActiveSpreadsheet().deleteSheet(hoja)
+}
+
+/** Pasa al archivo privado las filas de una pestaña técnica de la hoja compartida. */
+function moverFilasAlPrivado(nombre, columnas) {
+  var compartida = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(nombre)
+  if (!compartida) return 0
+
+  var destino = obtenerHoja(nombre, columnas)
+  var filas = leerFilas(compartida, columnas)
+  filas.forEach(function (fila) {
+    destino.appendRow(filaDesdeObjeto(fila, columnas))
+  })
+  SpreadsheetApp.getActiveSpreadsheet().deleteSheet(compartida)
+  return filas.length
+}
+
+/**
+ * Convierte una pestaña por tipo en vista automática de Respuestas: títulos
+ * en la fila 1 y una fórmula FILTER en A2. Nadie escribe en ella.
+ */
+function prepararVista(tipo) {
+  var libro = SpreadsheetApp.getActiveSpreadsheet()
+  var nombre = HOJA_POR_TIPO[tipo]
+  var hoja = libro.getSheetByName(nombre) || libro.insertSheet(nombre)
+
+  hoja.clear()
+  hoja.showColumns(1, hoja.getMaxColumns())
+  var titulos = COLUMNAS_RESPUESTAS.map(titulo)
+  hoja.getRange(1, 1, 1, titulos.length).setValues([titulos]).setFontWeight('bold')
+  hoja.setFrozenRows(1)
+  prepararColumnas(hoja, COLUMNAS_RESPUESTAS, 1)
+  hoja
+    .getRange(1, 1)
+    .setNote(
+      'Esta pestaña se llena sola con las cuentas de tipo "' + tipo + '" de la pestaña Respuestas. ' +
+        'No escribas acá: los cambios se hacen en Respuestas.',
+    )
+  hoja
+    .getRange(2, 1)
+    .setFormula('=IFERROR(FILTER(' + HOJA_RESPUESTAS + '!A2:K, ' + HOJA_RESPUESTAS + '!D2:D="' + tipo + '"), "")')
+}
+
+/** ¿La pestaña por tipo ya es una vista (y no tiene datos propios)? */
+function esVista(hoja) {
+  return String(hoja.getRange(1, 1).getValue()) === titulo('marcaTemporal')
 }
 
 /**
@@ -786,12 +979,12 @@ function respaldar(hoja, nombre) {
  * editor (menú de funciones → actualizarHojas → Ejecutar).
  *
  *   - Hora de Bolivia para toda la hoja.
- *   - "Usuarios" se reparte en Empresas, Recolectores y Ambos, con sus
- *     contraseñas: nadie tiene que crear una nueva.
- *   - Publicaciones gana Fecha y Hora legibles.
- *   - "Contactos" pasa a "Consultas", con columnas que se explican solas.
- *   - Las pestañas viejas NO se borran: quedan ocultas con "(respaldo)".
- *   - Las pestañas técnicas (Sesiones, Guardados, Recuperaciones) se ocultan.
+ *   - Todas las cuentas pasan a "Respuestas" (los 7 títulos de la guía, de A
+ *     a G). Empresas, Recolectores y Ambos quedan como vistas automáticas.
+ *   - Contraseñas, sesiones, guardados, códigos de recuperación y respaldos se
+ *     mudan a un archivo privado que no se comparte. Nadie pierde su
+ *     contraseña y nada se borra: los respaldos quedan en el archivo privado.
+ *   - Publicaciones y Consultas en su formato nuevo.
  *
  * Se puede ejecutar más de una vez: lo que ya está convertido no se duplica.
  */
@@ -799,8 +992,7 @@ function actualizarHojas() {
   var libro = SpreadsheetApp.getActiveSpreadsheet()
 
   // La versión del 16/10 usaba otras columnas y no guardaba las contraseñas
-  // en la hoja: convertirla perdería cuentas. Hay que volver antes a la hoja
-  // del 11/10 con el historial de versiones.
+  // en la hoja: convertirla perdería cuentas.
   var empresas = libro.getSheetByName('Empresas')
   if (empresas && String(empresas.getRange(1, 9).getValue()) === 'ID') {
     throw new Error(
@@ -810,41 +1002,84 @@ function actualizarHojas() {
   }
 
   libro.setSpreadsheetTimeZone(ZONA_HORARIA)
+  var privado = libroPrivado()
   var resumen = []
 
-  // 1. Cuentas: de "Usuarios" a una pestaña por tipo.
-  var usuarios = libro.getSheetByName('Usuarios')
-  if (usuarios) {
-    var yaEstan = {}
-    leerCuentas().forEach(function (fila) {
-      yaEstan[String(fila.id)] = true
-    })
+  var ids = {}
+  var correos = {}
+  leerCuentas().forEach(function (cuenta) {
+    ids[cuenta.id] = true
+    correos[cuenta.correo] = true
+  })
 
-    var movidas = 0
-    leerFilas(usuarios, ANTERIOR_USUARIOS).forEach(function (fila) {
-      if (yaEstan[String(fila.id)] || /^PRUEBA CLAUDE/i.test(String(fila.empresa))) return
-
-      var fecha = fechaDesde(fila.creadoEn)
-      fila.fecha = fecha
-      fila.hora = fecha
-      fila.tipo = HOJA_POR_TIPO[fila.tipo] ? fila.tipo : 'oferente'
-      fila.creadoEn = formatearMarcaTemporal(fila.creadoEn)
-      fila.telefono = normalizarTelefono(fila.telefono)
-      fila.correo = String(fila.correo).toLowerCase()
-      fila.correoConfirmacion = 'Registro anterior (sin correo)'
-      agregarCuenta(fila)
-      movidas++
-    })
-
-    respaldar(usuarios, 'Usuarios (respaldo)')
-    resumen.push('Cuentas repartidas en Empresas, Recolectores y Ambos: ' + movidas)
+  /** Pasa una cuenta vieja a Respuestas y su contraseña al archivo privado. */
+  var pasarCuenta = function (cuenta, hashClave, sal) {
+    var correo = String(cuenta.correo).toLowerCase()
+    if (ids[String(cuenta.id)] || correos[correo] || /^PRUEBA CLAUDE/i.test(String(cuenta.empresa))) return false
+    cuenta.correo = correo
+    cuenta.tipo = HOJA_POR_TIPO[cuenta.tipo] ? cuenta.tipo : 'oferente'
+    agregarCuenta(cuenta)
+    if (hashClave && !credencialDe(cuenta.id)) guardarCredencial(cuenta.id, String(hashClave), String(sal))
+    ids[String(cuenta.id)] = true
+    correos[correo] = true
+    return true
   }
 
-  // 2. Publicaciones del formato anterior (la columna A se llamaba "id").
+  // 1. Cuentas de la versión del 11/10 (una sola pestaña "Usuarios").
+  var usuarios = libro.getSheetByName('Usuarios')
+  if (usuarios) {
+    var movidas = 0
+    leerFilas(usuarios, ANTERIOR_USUARIOS).forEach(function (fila) {
+      var cuenta = {
+        id: String(fila.id),
+        empresa: fila.empresa,
+        contacto: fila.contacto,
+        telefono: normalizarTelefono(fila.telefono),
+        correo: fila.correo,
+        tipo: String(fila.tipo),
+        creadoEn: formatearMarcaTemporal(fila.creadoEn),
+        zonaInteres: fila.zonaInteres,
+        correoConfirmacion: 'Registro anterior (sin correo)',
+      }
+      if (pasarCuenta(cuenta, fila.hashClave, fila.sal)) movidas++
+    })
+    moverAlPrivado(usuarios, 'Usuarios (respaldo)')
+    resumen.push('Cuentas pasadas a Respuestas desde "Usuarios": ' + movidas)
+  }
+
+  // 2. Cuentas de la versión del 17/10 (una pestaña por tipo, con contraseñas).
+  Object.keys(HOJA_POR_TIPO).forEach(function (tipo) {
+    var hoja = libro.getSheetByName(HOJA_POR_TIPO[tipo])
+    if (!hoja || esVista(hoja) || hoja.getLastRow() < 1) return
+
+    var pasadas = 0
+    leerFilas(hoja, CUENTAS_17_OCTUBRE).forEach(function (fila) {
+      var cuenta = {
+        id: String(fila.id),
+        empresa: fila.empresa,
+        contacto: fila.contacto,
+        telefono: normalizarTelefono(fila.telefono),
+        correo: fila.correo,
+        tipo: String(fila.tipo || tipo),
+        fecha: esFecha(fila.fecha) ? fila.fecha : '',
+        creadoEn: formatearMarcaTemporal(fila.creadoEn),
+        zonaInteres: fila.zonaInteres,
+        correoConfirmacion: fila.correoConfirmacion,
+      }
+      if (pasarCuenta(cuenta, fila.hashClave, fila.sal)) pasadas++
+    })
+
+    // La pestaña vieja (con hash y sal) queda como respaldo en el archivo privado.
+    var copia = hoja.copyTo(privado)
+    copia.setName(nombreLibre(privado, HOJA_POR_TIPO[tipo] + ' (respaldo)'))
+    resumen.push('Cuentas pasadas a Respuestas desde "' + HOJA_POR_TIPO[tipo] + '": ' + pasadas)
+  })
+
+  // 3. Publicaciones del formato anterior (la columna A se llamaba "id").
   var publicaciones = libro.getSheetByName(HOJA_PUBLICACIONES)
   if (publicaciones && String(publicaciones.getRange(1, 1).getValue()) === 'id') {
     var filasPublicaciones = leerFilas(publicaciones, ANTERIOR_PUBLICACIONES)
-    respaldar(publicaciones, 'Publicaciones (respaldo)')
+    moverAlPrivado(publicaciones, 'Publicaciones (respaldo)')
     var nuevas = obtenerHoja(HOJA_PUBLICACIONES, COLUMNAS_PUBLICACIONES)
 
     filasPublicaciones.forEach(function (fila) {
@@ -859,12 +1094,12 @@ function actualizarHojas() {
     resumen.push('Publicaciones con fecha y hora: ' + filasPublicaciones.length)
   }
 
-  // 3. Consultas: antes la pestaña se llamaba "Contactos" (formato del 11/10 o del 16/10).
+  // 4. Consultas: antes la pestaña se llamaba "Contactos" (formato del 11/10 o del 16/10).
   var contactos = libro.getSheetByName(HOJA_CONTACTOS)
   if (contactos) {
     var delOnce = String(contactos.getRange(1, 1).getValue()) === 'publicacionId'
     var filasContactos = leerFilas(contactos, delOnce ? ANTERIOR_CONTACTOS : CONTACTOS_16_OCTUBRE)
-    respaldar(contactos, 'Contactos (respaldo)')
+    moverAlPrivado(contactos, 'Contactos (respaldo)')
 
     var consultas = obtenerHoja(HOJA_CONSULTAS, COLUMNAS_CONSULTAS)
     var vistas = {}
@@ -918,7 +1153,7 @@ function actualizarHojas() {
     resumen.push('Consultas (antes "Contactos"): ' + convertidas)
   }
 
-  // 4. Títulos que cambiaron de nombre (por ejemplo "Contactos recibidos").
+  // 5. Títulos que cambiaron de nombre (por ejemplo "Contactos recibidos").
   var hojaPublicacionesActual = obtenerHoja(HOJA_PUBLICACIONES, COLUMNAS_PUBLICACIONES)
   Object.keys(TITULOS_ANTERIORES).forEach(function (columna) {
     var numero = COLUMNAS_PUBLICACIONES.indexOf(columna) + 1
@@ -927,22 +1162,45 @@ function actualizarHojas() {
     if (String(celda.getValue()) === TITULOS_ANTERIORES[columna]) celda.setValue(titulo(columna))
   })
 
-  // 5. Pestañas que falten, técnicas ocultas y orden de lectura.
-  Object.keys(HOJA_POR_TIPO).forEach(hojaDeTipo)
+  // 6. Sesiones, guardados y códigos de recuperación: al archivo privado.
+  var sesiones = moverFilasAlPrivado(HOJA_SESIONES, COLUMNAS_SESIONES)
+  var guardados = moverFilasAlPrivado(HOJA_GUARDADOS, COLUMNAS_GUARDADOS)
+  var recuperaciones = moverFilasAlPrivado(HOJA_RECUPERACIONES, COLUMNAS_RECUPERACIONES)
+  if (sesiones + guardados + recuperaciones > 0) {
+    resumen.push(
+      'Pasadas al archivo privado: ' + sesiones + ' sesiones, ' + guardados + ' guardados, ' +
+        recuperaciones + ' códigos de recuperación',
+    )
+  }
+
+  // 7. Respaldos de versiones anteriores (con contraseñas): al archivo privado.
+  libro.getSheets().forEach(function (hoja) {
+    if (/\(respaldo\)/.test(hoja.getName())) {
+      resumen.push('Respaldo pasado al archivo privado: ' + hoja.getName())
+      moverAlPrivado(hoja, hoja.getName())
+    }
+  })
+
+  // 8. Vistas por tipo, pestañas que falten y orden de lectura.
+  hojaRespuestas()
+  Object.keys(HOJA_POR_TIPO).forEach(prepararVista)
   obtenerHoja(HOJA_PUBLICACIONES, COLUMNAS_PUBLICACIONES)
   obtenerHoja(HOJA_CONSULTAS, COLUMNAS_CONSULTAS)
-  obtenerHoja(HOJA_SESIONES, COLUMNAS_SESIONES).hideSheet()
-  obtenerHoja(HOJA_GUARDADOS, COLUMNAS_GUARDADOS).hideSheet()
-  obtenerHoja(HOJA_RECUPERACIONES, COLUMNAS_RECUPERACIONES).hideSheet()
+  hojaCredenciales()
+  obtenerHoja(HOJA_SESIONES, COLUMNAS_SESIONES)
+  obtenerHoja(HOJA_GUARDADOS, COLUMNAS_GUARDADOS)
+  obtenerHoja(HOJA_RECUPERACIONES, COLUMNAS_RECUPERACIONES)
 
-  var orden = ['Empresas', 'Recolectores', 'Ambos', HOJA_PUBLICACIONES, HOJA_CONSULTAS]
+  var orden = [HOJA_RESPUESTAS, 'Empresas', 'Recolectores', 'Ambos', HOJA_PUBLICACIONES, HOJA_CONSULTAS]
   orden.forEach(function (nombre, posicion) {
     libro.setActiveSheet(libro.getSheetByName(nombre))
     libro.moveActiveSheet(posicion + 1)
   })
-  libro.setActiveSheet(libro.getSheetByName('Empresas'))
+  libro.setActiveSheet(libro.getSheetByName(HOJA_RESPUESTAS))
 
-  // 6. Lo que necesita el script para funcionar.
+  // 9. Lo que necesita el script para funcionar.
+  resumen.push('Cuentas en Respuestas: ' + leerCuentas().length)
+  resumen.push('Archivo privado (NO compartir): ' + privado.getUrl())
   resumen.push('Correos disponibles hoy: ' + MailApp.getRemainingDailyQuota())
   resumen.push(
     PropertiesService.getScriptProperties().getProperty(PROPIEDAD_CLAVE_ADMIN)
@@ -957,6 +1215,16 @@ function actualizarHojas() {
   var texto = 'Listo.\n' + resumen.join('\n')
   Logger.log(texto)
   return texto
+}
+
+/**
+ * Ejecutar desde el editor ANTES de implementar la versión nueva: crea (o
+ * abre) el archivo privado para que Google pida el permiso una sola vez.
+ */
+function prepararArchivoPrivado() {
+  var privado = libroPrivado()
+  Logger.log('Archivo privado listo (NO compartir): ' + privado.getUrl())
+  return privado.getUrl()
 }
 
 function cerrarSesion(token) {
@@ -974,20 +1242,13 @@ function actualizarPerfil(usuarioId, datos) {
   var fila = buscarCuenta('id', usuarioId)
   if (!fila) return rechazo('sesion_invalida', 'La cuenta ya no existe.')
 
-  var tipoAnterior = String(fila.tipo)
   fila.empresa = texto(datos.empresa, 120)
   fila.contacto = texto(datos.contacto, 120)
   fila.telefono = texto(datos.telefono, 30).replace(/\s+/g, '')
   fila.tipo = datos.tipo
-  fila.zonaInteres = texto(datos.zonaInteres, 20)
-
-  if (tipoAnterior === fila.tipo) {
-    escribirFila(fila._hoja, fila._fila, fila, COLUMNAS_USUARIOS)
-  } else {
-    // Cambió de tipo: la cuenta se muda a la pestaña que le corresponde.
-    fila._hoja.deleteRow(fila._fila)
-    agregarCuenta(fila)
-  }
+  fila.zonaInteres = texto(datos.zonaInteres, 30)
+  // Si cambió de tipo, las vistas Empresas / Recolectores / Ambos se actualizan solas.
+  guardarCuenta(fila)
 
   var hojaPublicaciones = obtenerHoja(HOJA_PUBLICACIONES, COLUMNAS_PUBLICACIONES)
   var actualizadas = 0
@@ -1228,6 +1489,12 @@ var NOMBRE_TIPO = {
   ambos: 'Oferente y recolector',
 }
 
+/** "2026-11-10" → "10/11/2026". */
+function formatearFechaLegible(valor) {
+  var fecha = fechaDeTexto(valor)
+  return fecha ? Utilities.formatDate(fecha, ZONA_HORARIA, 'dd/MM/yyyy') : ''
+}
+
 function horaDeBolivia(fecha) {
   return Utilities.formatDate(fecha, ZONA_HORARIA, 'dd/MM/yyyy HH:mm')
 }
@@ -1258,6 +1525,9 @@ function enviarBienvenida(cuenta) {
         'Confirmamos el registro de ' + cuenta.empresa + ' en EcoConecta SCZ como ' +
         NOMBRE_TIPO[cuenta.tipo] + '.\n\n' +
         'Correo: ' + cuenta.correo + '\nTeléfono / WhatsApp: ' + cuenta.telefono + '\n' +
+        'Lugar: ' + (cuenta.zonaInteres || '—') + '\nFecha estimada: ' +
+        (cuenta.fechaServicio ? formatearFechaLegible(cuenta.fechaServicio) : '—') + '\n' +
+        'Mensaje: ' + (cuenta.mensaje || '—') + '\n' +
         'Fecha de registro: ' + horaDeBolivia(cuenta.fecha) + '\n\n' +
         'Ingresá en ' + URL_SITIO + '\n\nEcoConecta SCZ — Santa Cruz de la Sierra',
       htmlBody:
@@ -1273,6 +1543,10 @@ function enviarBienvenida(cuenta) {
         '<table style="border-collapse:collapse;margin:12px 0;font-size:14px">' +
         datoCorreo('Correo', cuenta.correo) +
         datoCorreo('Teléfono / WhatsApp', cuenta.telefono) +
+        datoCorreo('Lugar', cuenta.zonaInteres || '—') +
+        datoCorreo(cuenta.tipo === 'recolector' ? 'Fecha estimada de recolección' : 'Fecha estimada de entrega',
+          cuenta.fechaServicio ? formatearFechaLegible(cuenta.fechaServicio) : '—') +
+        datoCorreo('Mensaje', cuenta.mensaje || '—') +
         datoCorreo('Fecha de registro', horaDeBolivia(cuenta.fecha)) +
         '</table><p><b>Próximos pasos:</b></p><ul>' + pasos + '</ul>' +
         '<p style="margin:24px 0"><a href="' + URL_SITIO + '" style="background:#16613c;color:#fff;' +
@@ -1372,6 +1646,9 @@ function datosAdmin(datos, token) {
     usuario.fecha = fechaLegible(fila.fecha)
     usuario.hora = horaLegible(fila.hora)
     usuario.correoConfirmacion = String(fila.correoConfirmacion)
+    usuario.lugar = String(fila.zonaInteres)
+    usuario.fechaServicio = fila.fechaServicio ? formatearFechaLegible(fila.fechaServicio) : ''
+    usuario.mensaje = String(fila.mensaje)
     return usuario
   })
 
@@ -1476,6 +1753,7 @@ function doPost(e) {
     if (accion === 'restablecer_clave') return restablecerClave(datos)
     if (accion === 'cerrar_sesion') return cerrarSesion(token)
     if (accion === 'registrar_contacto') return registrarContacto(validarSesion(token), datos)
+    if (accion === 'datos_contacto') return datosContacto(datos)
     if (accion === 'admin_datos') return datosAdmin(datos, token)
     if (accion === 'admin_publicacion') return publicacionAdmin(datos, token)
 
@@ -1500,12 +1778,32 @@ function doGet(e) {
     var accion = (e && e.parameter && e.parameter.accion) || 'listar_publicaciones'
 
     if (accion === 'listar_publicaciones') return listarPublicaciones()
-    if (accion === 'estado') return respuesta({ ok: true, version: 5 })
+    if (accion === 'estado') return respuesta({ ok: true, version: 6 })
 
     return rechazo('accion_desconocida', 'Acción no reconocida: ' + accion)
   } catch (error) {
     return rechazo('error_interno', String(error))
   }
+}
+
+/**
+ * Datos de contacto de UNA publicación disponible: se piden al tocar
+ * "Contactar". Así no se puede descargar la lista completa de teléfonos.
+ */
+function datosContacto(datos) {
+  var publicacion = buscar(
+    leerFilas(obtenerHoja(HOJA_PUBLICACIONES, COLUMNAS_PUBLICACIONES), COLUMNAS_PUBLICACIONES),
+    'id',
+    datos.id,
+  )
+  if (!publicacion || String(publicacion.estado) !== 'disponible') {
+    return rechazo('no_existe', 'Esta publicación ya no está disponible.')
+  }
+  return respuesta({
+    ok: true,
+    telefono: normalizarTelefono(publicacion.telefono),
+    contacto: String(publicacion.contacto),
+  })
 }
 
 function listarPublicaciones() {
@@ -1529,7 +1827,10 @@ function listarPublicaciones() {
     publicacion.fotoId = null
     publicacion.id = String(publicacion.id)
     publicacion.usuarioId = String(publicacion.usuarioId)
-    publicacion.telefono = normalizarTelefono(publicacion.telefono)
+    // El teléfono y la persona de contacto no van en la lista pública: se
+    // entregan de a uno, cuando alguien toca "Contactar" (datos_contacto).
+    delete publicacion.telefono
+    delete publicacion.contacto
     publicacion.fechaDisponible = formatearFecha(publicacion.fechaDisponible)
     publicacion.creadaEn = formatearMarcaTemporal(publicacion.creadaEn)
 

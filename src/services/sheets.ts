@@ -117,6 +117,25 @@ export function sincronizarContacto(id: string, medio: MedioContacto): Promise<R
   return enviar('registrar_contacto', { id, medio })
 }
 
+export interface DatosContacto {
+  telefono: string
+  contacto: string
+}
+
+/**
+ * Teléfono y persona de contacto de UNA publicación. La lista pública no los
+ * trae (así no se puede descargar la lista de teléfonos): se piden al tocar
+ * "Contactar". Si falla, lanza un error con un mensaje para mostrar.
+ */
+export async function obtenerDatosContacto(id: string): Promise<DatosContacto> {
+  const respuesta = await llamar('datos_contacto', { id })
+  if (!respuesta) {
+    throw new Error('No pudimos conectarnos. Revisá tu conexión a internet e intentá de nuevo.')
+  }
+  if (!respuesta.ok) throw new Error(respuesta.error ?? 'No se pudieron obtener los datos de contacto.')
+  return { telefono: String(respuesta.telefono ?? ''), contacto: String(respuesta.contacto ?? '') }
+}
+
 /**
  * Trae las publicaciones de la hoja (lectura pública, sin sesión).
  * Devuelve null si la hoja no está configurada o la consulta falla.

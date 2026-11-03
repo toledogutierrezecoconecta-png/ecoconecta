@@ -153,29 +153,52 @@ aplicación web hace de servidor: lee y escribe la hoja y decide quién puede ha
 del script está en [`apps-script/Codigo.gs`](apps-script/Codigo.gs) y su URL en
 [`src/services/config.ts`](src/services/config.ts).
 
-### Pestañas de la hoja
+### Pestañas de la hoja compartida
 
 | Pestaña | Qué guarda |
 | --- | --- |
-| **Empresas** | Cuentas de tipo oferente (negocios que generan residuos). |
-| **Recolectores** | Cuentas de tipo recolector / comprador. |
-| **Ambos** | Cuentas que ofrecen y buscan materiales. |
-| **Publicaciones** | Las ofertas del marketplace. Es la única pestaña de lectura pública. |
+| **Respuestas** | **Todas las cuentas.** De A a G, los 7 títulos de la guía del profesor: **Marca temporal · Nombre · Email · Tipo · Lugar · Fecha · Mensaje**. Desde la H: Empresa / negocio · Teléfono · Correo de confirmación · ID. |
+| **Empresas** | Vista automática de Respuestas: las cuentas de tipo oferente. |
+| **Recolectores** | Vista automática: las cuentas de tipo recolector / comprador. |
+| **Ambos** | Vista automática: las cuentas que ofrecen y buscan materiales. |
+| **Publicaciones** | Las ofertas del marketplace. |
 | **Consultas** | Cada vez que alguien tocó **WhatsApp** o **Llamar** en una publicación: qué material, de quién era, quién consultó (o "Visitante sin cuenta"), cómo ubicarlo y por qué medio. Antes se llamaba "Contactos". |
-| **Sesiones** *(oculta)* | Llaves de sesión activas; vencen a los 60 días. |
-| **Guardados** *(oculta)* | Qué publicaciones guardó cada usuario. |
-| **Recuperaciones** *(oculta)* | Códigos para restablecer la contraseña (guardados como hash), con vencimiento e intentos. |
 
-- **Fecha y Hora** son las dos primeras columnas de Empresas, Recolectores, Ambos, Publicaciones
-  y Consultas, en hora de Bolivia (`America/La_Paz`). La hoja se configura en esa zona horaria.
-- En las pestañas de cuentas, la contraseña se guarda como hash SHA-256 con sal en las columnas
-  `hashClave` y `sal`, que quedan **ocultas**. Nunca en texto plano.
-- Si una cuenta cambia de tipo en su perfil, su fila se muda a la pestaña que corresponde.
+- **Lugar, Fecha y Mensaje** se piden al registrarse: la zona donde opera, la fecha estimada de la
+  primera entrega (oferente) o recolección (recolector) y qué materiales genera o busca.
+- **Empresas, Recolectores y Ambos no se editan:** tienen una fórmula `FILTER` en A2 que muestra
+  las filas de Respuestas de ese tipo. Si una cuenta cambia de tipo, cambia de vista sola.
+- **Fecha y hora** en hora de Bolivia (`America/La_Paz`). La hoja se configura en esa zona horaria.
 - El script lee **por posición**: se puede cambiar el título de una columna, pero no moverla.
 - Las pestañas y columnas que falten se crean solas. Las columnas nuevas se agregan al final, así
   que las filas existentes no se tocan.
-- Las pestañas que terminan en **(respaldo)** son las de la versión anterior a la actualización.
-  Quedan ocultas y se pueden borrar una vez comprobado que todo funciona.
+
+### Archivo privado (NO compartir)
+
+Lo sensible no está en la hoja compartida: vive en **"EcoConecta SCZ – Datos privados (NO
+compartir)"**, un archivo que el script crea en el Drive de la cuenta dueña (su id queda en la
+propiedad `LIBRO_PRIVADO_ID`). **Nunca se comparte con nadie.**
+
+| Pestaña | Qué guarda |
+| --- | --- |
+| **Credenciales** | Hash SHA-256 (1000 iteraciones) y sal de cada contraseña. Nunca en texto plano. |
+| **Sesiones** | Llaves de sesión activas; vencen a los 60 días. |
+| **Guardados** | Qué publicaciones guardó cada usuario. |
+| **Recuperaciones** | Códigos para restablecer la contraseña (guardados como hash), con vencimiento e intentos. |
+| **… (respaldo)** | Las pestañas de versiones anteriores, completas. Se pueden borrar cuando todo esté comprobado. |
+
+Si se borra este archivo, nadie puede iniciar sesión hasta crear una contraseña nueva con
+"¿Olvidaste tu contraseña?". El script no crea otro por su cuenta si el id existe y no se puede abrir.
+
+### Protecciones
+
+- **Teléfonos fuera de la lista pública.** La lectura pública de publicaciones no trae el
+  teléfono ni la persona de contacto: se piden de a una publicación (`datos_contacto`) cuando
+  alguien toca "Contactar".
+- **Campo anti-spam (honeypot).** El registro tiene un campo `website` invisible; si llega con
+  texto, el script rechaza el registro sin guardar nada.
+- **LockService.** `doPost` toma `LockService.getScriptLock()`: dos envíos simultáneos no se pisan.
+- **Fórmulas.** Cualquier texto que empiece con `=`, `+`, `-` o `@` se guarda como texto.
 
 ### Consultas: para qué sirven
 
@@ -316,6 +339,16 @@ npm run sheets:publicar
 
 > Nunca crees una implementación nueva desde el editor de Apps Script: cambiaría la URL `/exec`
 > y el sitio dejaría de conectarse con la hoja.
+
+### Al pasar a la versión con Respuestas y archivo privado (una sola vez)
+
+1. Pegar el código nuevo y guardar.
+2. Ejecutar **`prepararArchivoPrivado`**: crea el archivo privado y Google pide el permiso para
+   crear y abrir hojas de cálculo.
+3. Implementar una **nueva versión** sobre la implementación de siempre.
+4. Ejecutar **`actualizarHojas`** enseguida: pasa las cuentas a Respuestas, las contraseñas a
+   Credenciales, mueve Sesiones, Guardados, Recuperaciones y los respaldos al archivo privado, y
+   convierte Empresas, Recolectores y Ambos en vistas.
 
 ### Al pasar desde la versión del 11/10 (una sola vez)
 

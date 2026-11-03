@@ -10,6 +10,9 @@ if (!CODIGO) {
   process.exit(1)
 }
 
+/** Lugar, Fecha y Mensaje: los tres campos que se agregaron al registro. */
+const EXTRA = { zona: 'DM-3', fecha: '2026-11-15', mensaje: 'Generamos cartón y plástico todas las semanas' }
+
 const pub = (id, extra = {}) => ({ id, titulo: 'Cartón ' + id, categoriaId: 'secos', materialId: 'carton-prensado', descripcion: 'Cartón de prueba', cantidad: 100, unidad: 'kg', frecuencia: 'Semanal', zona: 'DM-3', direccion: 'Prueba', modalidadPrecio: 'referencia', valorEstimadoMin: 80, valorEstimadoMax: 140, fechaDisponible: '2026-10-12', estado: 'disponible', contactos: 0, creadaEn: '2026-10-11T20:00:00.000Z', origen: 'usuario', ...extra })
 
 let pasadas = 0
@@ -29,29 +32,48 @@ if (CODIGO) {
   const s = cargarScript(CODIGO, libroComoElReal())
   const hoja = (n) => s.libro.getSheetByName(n).datos
   const pestana = (n) => s.libro.getSheetByName(n)
+  const privada = (n) => s.privado().getSheetByName(n).datos
   const esFecha = (v) => v && typeof v.getTime === 'function'
+  /** Una cuenta en Respuestas (la columna K es el ID). */
+  const cuentaEnRespuestas = (id) => hoja('Respuestas').find((f) => f[10] === id)
+  /** ¿Algún valor de la hoja compartida es un hash o una sal? */
+  /** Teléfono guardado en la pestaña Publicaciones (la lista pública ya no lo trae). */
+  const telefonoEnHoja = (id) => hoja('Publicaciones').find((f) => f[21] === id)[5]
+  const compartidaTiene = (valor) => s.libro.getSheets().some((h) => h.datos.some((f) => f.includes(valor)))
   let tokenAna, tokenLuis, idAna
 
   console.log('\nActualización de la hoja (actualizarHojas)')
   let resumen
   prueba('se ejecuta sin errores y deja un resumen', () => {
     resumen = s.ejecutar('actualizarHojas')
-    assert.match(resumen, /Cuentas repartidas en Empresas, Recolectores y Ambos: 3/)
+    assert.match(resumen, /Cuentas pasadas a Respuestas desde "Usuarios": 3/)
     assert.match(resumen, /Publicaciones con fecha y hora: 2/)
     assert.match(resumen, /Consultas \(antes "Contactos"\): 1/)
+    assert.match(resumen, /Archivo privado \(NO compartir\): https:\/\/docs\.google\.com/)
     assert.match(resumen, /Clave de administrador: FALTA/)
   })
   prueba('pone la hoja en hora de Bolivia', () => {
     assert.equal(s.libro.zonaHoraria, 'America/La_Paz')
   })
-  prueba('reparte las cuentas por tipo, con fecha y hora legibles', () => {
-    assert.deepEqual([...hoja('Empresas')[0].slice(0, 7)], ['Fecha', 'Hora', 'Empresa / negocio', 'Contacto', 'Teléfono', 'Correo', 'Tipo'])
-    assert.equal(hoja('Empresas').length, 3)
-    assert.equal(hoja('Recolectores').length, 2)
-    assert.equal(hoja('Ambos').length, 1)
-    const pollos = hoja('Empresas').find((f) => f[9] === 'usr-viejo-1')
-    assert.ok(esFecha(pollos[0]) && esFecha(pollos[1]))
-    assert.equal(pollos[4], '70000010', 'el teléfono queda como texto')
+  prueba('"Respuestas" tiene los 7 títulos de la guía de A a G', () => {
+    assert.deepEqual([...hoja('Respuestas')[0].slice(0, 7)], ['Marca temporal', 'Nombre', 'Email', 'Tipo', 'Lugar', 'Fecha', 'Mensaje'])
+    assert.deepEqual([...hoja('Respuestas')[0].slice(7)], ['Empresa / negocio', 'Teléfono', 'Correo de confirmación', 'ID'])
+    assert.match(pestana('Respuestas').notas['1,6'], /Fecha estimada/)
+  })
+  prueba('todas las cuentas viejas pasan a Respuestas', () => {
+    assert.equal(hoja('Respuestas').length, 4)
+    const pollos = cuentaEnRespuestas('usr-viejo-1')
+    assert.ok(esFecha(pollos[0]))
+    assert.deepEqual([...pollos.slice(1, 5)], ['Marcela Prueba', 'pollos@ejemplo.test', 'oferente', ''])
+    assert.equal(pollos[8], '70000010', 'el teléfono queda como texto')
+    assert.equal(cuentaEnRespuestas('usr-imprenta')[4], 'DM-5', 'la zona pasa a Lugar')
+  })
+  prueba('Empresas, Recolectores y Ambos son vistas automáticas de Respuestas', () => {
+    assert.match(pestana('Empresas').getRange(2, 1).getFormula(), /^=IFERROR\(FILTER\(Respuestas!A2:K, Respuestas!D2:D="oferente"\)/)
+    assert.match(pestana('Recolectores').getRange(2, 1).getFormula(), /D2:D="recolector"/)
+    assert.match(pestana('Ambos').getRange(2, 1).getFormula(), /D2:D="ambos"/)
+    assert.equal(hoja('Empresas')[0][0], 'Marca temporal')
+    assert.match(pestana('Empresas').notas['1,1'], /se llena sola/)
   })
   prueba('conserva la contraseña de quien se registró con la versión anterior', () => {
     const r = s.post('iniciar_sesion', { correo: 'imprenta@ejemplo.test', clave: CLAVE_IMPRENTA })
@@ -60,8 +82,27 @@ if (CODIGO) {
     assert.equal(r.usuario.tipo, 'recolector')
     assert.equal(r.usuario.zonaInteres, 'DM-5')
   })
-  prueba('oculta el hash y la sal', () => {
-    assert.ok(pestana('Recolectores').columnasOcultas.has(12) && pestana('Recolectores').columnasOcultas.has(13))
+  prueba('las contraseñas viven solo en el archivo privado', () => {
+    const credencial = privada('Credenciales').find((f) => f[0] === 'usr-imprenta')
+    assert.ok(credencial && String(credencial[1]).length > 20)
+    assert.equal(compartidaTiene(credencial[1]), false, 'el hash no está en la hoja compartida')
+    assert.equal(compartidaTiene(credencial[2]), false, 'la sal no está en la hoja compartida')
+  })
+  prueba('sesiones, guardados y recuperaciones pasan al archivo privado', () => {
+    for (const nombre of ['Sesiones', 'Guardados', 'Recuperaciones']) {
+      assert.equal(s.libro.getSheetByName(nombre), null, nombre + ' sigue en la hoja compartida')
+      assert.ok(s.privado().getSheetByName(nombre), nombre + ' no está en el archivo privado')
+    }
+  })
+  prueba('no borra nada: los respaldos quedan en el archivo privado, no en la hoja compartida', () => {
+    for (const nombre of ['Usuarios (respaldo)', 'Publicaciones (respaldo)', 'Contactos (respaldo)']) {
+      assert.ok(s.privado().getSheetByName(nombre), nombre)
+      assert.equal(s.libro.getSheetByName(nombre), null)
+    }
+    assert.ok(s.privado().getSheetByName('Usuarios (respaldo)').datos.length === 4)
+  })
+  prueba('la hoja compartida queda solo con las pestañas que se leen, en orden', () => {
+    assert.deepEqual(s.libro.pestanas(), ['Respuestas', 'Empresas', 'Recolectores', 'Ambos', 'Publicaciones', 'Consultas'])
   })
   prueba('las publicaciones ganan fecha y hora sin perder nada', () => {
     assert.equal(hoja('Publicaciones')[0][0], 'Fecha')
@@ -73,48 +114,36 @@ if (CODIGO) {
     const consulta = hoja('Consultas')[1]
     assert.ok(esFecha(consulta[0]))
     assert.deepEqual([...consulta.slice(2, 10)], ['Aceite pub-viejo-1', 'Pollos Prueba', 'Imprenta Prueba', 'Melisa Prueba', '70000012', 'imprenta@ejemplo.test', 'recolector', 'No registrado'])
-    assert.equal(s.libro.getSheetByName('Contactos'), null)
-  })
-  prueba('no borra nada: las pestañas viejas quedan ocultas como respaldo', () => {
-    for (const nombre of ['Usuarios (respaldo)', 'Publicaciones (respaldo)', 'Contactos (respaldo)']) {
-      assert.ok(pestana(nombre), nombre)
-      assert.equal(pestana(nombre).oculta, true)
-    }
-    assert.equal(s.libro.getSheetByName('Usuarios'), null)
-  })
-  prueba('oculta las pestañas técnicas y ordena las que se leen', () => {
-    for (const nombre of ['Sesiones', 'Guardados', 'Recuperaciones']) assert.equal(pestana(nombre).oculta, true, nombre)
-    assert.deepEqual(s.libro.pestanas().slice(0, 5), ['Empresas', 'Recolectores', 'Ambos', 'Publicaciones', 'Consultas'])
   })
   prueba('la columna de Publicaciones se llama "Consultas recibidas"', () => {
     assert.ok(hoja('Publicaciones')[0].includes('Consultas recibidas'))
-    assert.ok(!hoja('Publicaciones')[0].includes('Contactos recibidos'))
-  })
-  prueba('una hoja con el título viejo "Contactos recibidos" no gana una columna de más', () => {
-    const otra = cargarScript(CODIGO, libroComoElReal())
-    otra.ejecutar('actualizarHojas')
-    const encabezado = otra.libro.getSheetByName('Publicaciones').datos[0]
-    encabezado[encabezado.indexOf('Consultas recibidas')] = 'Contactos recibidos'
-    const ancho = encabezado.length
-    otra.get()
-    assert.equal(otra.libro.getSheetByName('Publicaciones').datos[0].length, ancho)
-    otra.ejecutar('actualizarHojas')
-    assert.ok(otra.libro.getSheetByName('Publicaciones').datos[0].includes('Consultas recibidas'))
   })
   prueba('ejecutarla dos veces no duplica nada', () => {
     s.ejecutar('actualizarHojas')
-    assert.equal(hoja('Empresas').length, 3)
+    assert.equal(hoja('Respuestas').length, 4)
     assert.equal(hoja('Publicaciones').length, 3)
     assert.equal(hoja('Consultas').length, 2)
+    assert.equal(privada('Credenciales').length, 2)
   })
-  prueba('convierte también "Contactos" con el formato del 16/10', () => {
+  prueba('pasa también la hoja del 17/10 (una pestaña por tipo, con contraseñas)', () => {
     const otra = cargarScript(CODIGO)
-    otra.libro.insertSheet('Contactos').appendRow(['Fecha', 'Hora', 'Título', 'ID publicación', 'ID usuario', 'Empresa / negocio', 'Contacto', 'Tipo'])
-    otra.libro.getSheetByName('Contactos').appendRow([new Date('2026-10-15T15:00:00Z'), new Date('2026-10-15T15:00:00Z'), 'Vidrio', 'pub-x', '', '', '', ''])
-    assert.match(otra.ejecutar('actualizarHojas'), /Consultas \(antes "Contactos"\): 1/)
-    const fila = otra.libro.getSheetByName('Consultas').datos[1]
-    assert.equal(fila[2], 'Vidrio')
-    assert.equal(fila[4], 'Visitante sin cuenta')
+    const titulos = ['Fecha', 'Hora', 'Empresa / negocio', 'Contacto', 'Teléfono', 'Correo', 'Tipo', 'Correo de confirmación', 'Zona de interés', 'ID', 'Creado (UTC)', 'hashClave', 'sal']
+    const empresas = otra.libro.insertSheet('Empresas')
+    empresas.appendRow(titulos)
+    const registro = new Date('2026-10-16T22:50:27-04:00')
+    empresas.appendRow([registro, registro, 'PRUEBA PROFESOR', 'PRUEBA PROFESOR', '70000000', 'profe@ejemplo.test', 'oferente', 'Enviado', '', 'usr-profe', '2026-10-17T02:50:26.880Z', 'hash-del-profe', 'sal-del-profe'])
+    otra.libro.insertSheet('Sesiones').appendRow(['token', 'usuarioId', 'creadaEn', 'expiraEn'])
+    otra.libro.getSheetByName('Sesiones').appendRow(['token-del-profe', 'usr-profe', '2026-10-17T02:50:27.000Z', Date.now() + 86400000])
+
+    assert.match(otra.ejecutar('actualizarHojas'), /desde "Empresas": 1/)
+    const fila = otra.libro.getSheetByName('Respuestas').datos[1]
+    assert.equal(fila[0].getTime(), registro.getTime(), 'conserva la marca temporal original')
+    assert.deepEqual([...fila.slice(1, 4)], ['PRUEBA PROFESOR', 'profe@ejemplo.test', 'oferente'])
+    assert.equal(fila[9], 'Enviado')
+    assert.ok(otra.libro.getSheetByName('Empresas').getRange(2, 1).getFormula().includes('FILTER'))
+    assert.ok(otra.privado().getSheetByName('Empresas (respaldo)'), 'la pestaña vieja queda de respaldo')
+    assert.deepEqual([...otra.privado().getSheetByName('Credenciales').datos[1]], ['usr-profe', 'hash-del-profe', 'sal-del-profe'])
+    assert.equal(otra.post('mi_actividad', {}, 'token-del-profe').ok, true, 'su sesión sigue sirviendo')
   })
   prueba('se niega a convertir una hoja con el formato del 16/10', () => {
     const otra = cargarScript(CODIGO)
@@ -124,18 +153,27 @@ if (CODIGO) {
   })
 
   console.log('\nLectura')
-  prueba('lista las publicaciones existentes con teléfono y fecha como texto', () => {
+  prueba('la lista pública no trae teléfonos ni personas de contacto', () => {
     const r = s.get()
     assert.equal(r.ok, true)
     assert.equal(r.publicaciones.length, 2)
-    assert.equal(r.publicaciones[0].telefono, '70000010')
+    assert.equal(r.publicaciones[0].telefono, undefined)
+    assert.equal(r.publicaciones[0].contacto, undefined)
+    assert.equal(r.publicaciones[0].empresa, 'Pollos Prueba')
     assert.equal(r.publicaciones[0].fechaDisponible, '2026-09-23')
     assert.equal(r.publicaciones[0].cantidad, 50)
+  })
+  prueba('el teléfono se entrega de a una publicación, al tocar "Contactar"', () => {
+    const r = s.post('datos_contacto', { id: 'pub-viejo-1' })
+    assert.equal(r.ok, true, JSON.stringify(r))
+    assert.equal(r.telefono, '70000010')
+    assert.equal(r.contacto, 'X')
+    assert.equal(s.post('datos_contacto', { id: 'no-existe' }).codigo, 'no_existe')
   })
 
   console.log('\nRegistro e inicio de sesión')
   prueba('registra una cuenta nueva y entrega una llave de sesión', () => {
-    const r = s.post('registrar_usuario', { empresa: 'Reciclajes Ana', contacto: 'Ana', telefono: '7000 0020', correo: 'Ana@Ejemplo.test', clave: 'secreta1', tipo: 'recolector' })
+    const r = s.post('registrar_usuario', { ...EXTRA, empresa: 'Reciclajes Ana', contacto: 'Ana', telefono: '7000 0020', correo: 'Ana@Ejemplo.test', clave: 'secreta1', tipo: 'recolector' })
     assert.equal(r.ok, true, JSON.stringify(r))
     assert.ok(r.token.length >= 60)
     assert.equal(r.usuario.correo, 'ana@ejemplo.test')
@@ -144,12 +182,25 @@ if (CODIGO) {
     tokenAna = r.token
     idAna = r.usuario.id
   })
-  prueba('queda en la pestaña de su tipo, con fecha y hora de hoy', () => {
-    const fila = hoja('Recolectores').find((f) => f[9] === idAna)
-    assert.ok(fila, 'Ana es recolectora')
-    assert.ok(esFecha(fila[0]) && esFecha(fila[1]))
-    assert.ok(Date.now() - fila[0].getTime() < 60000)
-    assert.equal(fila[7], 'Enviado')
+  prueba('queda en Respuestas con cada dato en su columna', () => {
+    const fila = cuentaEnRespuestas(idAna)
+    assert.ok(fila, 'Ana no está en Respuestas')
+    assert.ok(esFecha(fila[0]) && Date.now() - fila[0].getTime() < 60000)
+    assert.deepEqual([...fila.slice(1, 5)], ['Ana', 'ana@ejemplo.test', 'recolector', 'DM-3'])
+    assert.ok(esFecha(fila[5]))
+    assert.deepEqual([...fila.slice(6, 10)], ['Generamos cartón y plástico todas las semanas', 'Reciclajes Ana', '70000020', 'Enviado'])
+  })
+  prueba('pide Lugar, Fecha y Mensaje', () => {
+    const base = { empresa: 'Sin datos', contacto: 'X', telefono: '70000023', correo: 'sin@datos.test', clave: 'secreta1', tipo: 'oferente' }
+    assert.match(s.post('registrar_usuario', { ...base, fecha: '2026-11-15', mensaje: 'Algo' }).error, /zona/)
+    assert.match(s.post('registrar_usuario', { ...base, zona: 'DM-1', mensaje: 'Algo' }).error, /fecha/)
+    assert.match(s.post('registrar_usuario', { ...base, zona: 'DM-1', fecha: '2026-11-15' }).error, /materiales/)
+  })
+  prueba('el campo trampa (honeypot) frena a los robots sin crear nada', () => {
+    const antes = hoja('Respuestas').length
+    const r = s.post('registrar_usuario', { ...EXTRA, empresa: 'Robot', contacto: 'Bot', telefono: '70000024', correo: 'bot@spam.test', clave: 'secreta1', tipo: 'oferente', website: 'http://spam.test' })
+    assert.equal(r.ok, false)
+    assert.equal(hoja('Respuestas').length, antes)
   })
   prueba('le llega el correo de confirmación con sus datos', () => {
     const correo = s.correos.find((c) => c.to === 'ana@ejemplo.test')
@@ -158,19 +209,23 @@ if (CODIGO) {
     assert.ok(correo.htmlBody.includes('Reciclajes Ana'))
     assert.ok(correo.htmlBody.includes('Recolector / comprador'))
     assert.ok(correo.htmlBody.includes('logo-correo.png'))
+    assert.ok(correo.htmlBody.includes('DM-3'), 'incluye el Lugar')
+    assert.ok(correo.htmlBody.includes('15/11/2026'), 'incluye la Fecha')
+    assert.ok(correo.htmlBody.includes('Generamos cartón'), 'incluye el Mensaje')
   })
-  prueba('la contraseña no queda en texto plano en la hoja', () => {
-    const fila = hoja('Recolectores').find((f) => f[9] === idAna)
-    assert.ok(!fila.includes('secreta1'))
-    assert.ok(String(fila[11]).length > 20)
+  prueba('la contraseña no queda en texto plano y su hash no está en la hoja compartida', () => {
+    assert.ok(!cuentaEnRespuestas(idAna).includes('secreta1'))
+    const credencial = privada('Credenciales').find((f) => f[0] === idAna)
+    assert.ok(String(credencial[1]).length > 20)
+    assert.equal(compartidaTiene(credencial[1]), false)
   })
   prueba('rechaza un correo repetido (sin importar mayúsculas)', () => {
-    const r = s.post('registrar_usuario', { empresa: 'Otra', contacto: 'Otra', telefono: '70000021', correo: 'ANA@ejemplo.test', clave: 'secreta1', tipo: 'oferente' })
+    const r = s.post('registrar_usuario', { ...EXTRA, empresa: 'Otra', contacto: 'Otra', telefono: '70000021', correo: 'ANA@ejemplo.test', clave: 'secreta1', tipo: 'oferente' })
     assert.equal(r.codigo, 'correo_existente')
   })
   prueba('rechaza contraseñas cortas y tipos inválidos', () => {
-    assert.equal(s.post('registrar_usuario', { empresa: 'A', contacto: 'A', telefono: '70000022', correo: 'a@b.test', clave: '123', tipo: 'oferente' }).codigo, 'datos_invalidos')
-    assert.equal(s.post('registrar_usuario', { empresa: 'A', contacto: 'A', telefono: '70000022', correo: 'a@b.test', clave: '123456', tipo: 'admin' }).codigo, 'datos_invalidos')
+    assert.equal(s.post('registrar_usuario', { ...EXTRA, empresa: 'A', contacto: 'A', telefono: '70000022', correo: 'a@b.test', clave: '123', tipo: 'oferente' }).codigo, 'datos_invalidos')
+    assert.equal(s.post('registrar_usuario', { ...EXTRA, empresa: 'A', contacto: 'A', telefono: '70000022', correo: 'a@b.test', clave: '123456', tipo: 'admin' }).codigo, 'datos_invalidos')
   })
   prueba('inicia sesión con la contraseña correcta (desde otro dispositivo)', () => {
     const r = s.post('iniciar_sesion', { correo: 'ana@ejemplo.test', clave: 'secreta1' })
@@ -217,7 +272,7 @@ if (CODIGO) {
     const p = s.get().publicaciones.find((x) => x.id === 'pub-a')
     assert.equal(p.usuarioId, 'usr-local-9')
     assert.equal(p.empresa, 'Imprenta Luis')
-    assert.equal(p.telefono, '70000030')
+    assert.equal(telefonoEnHoja('pub-a'), '70000030')
     assert.equal(p.contactos, 0)
   })
   prueba('reintentar la creación no duplica', () => {
@@ -296,14 +351,14 @@ if (CODIGO) {
     assert.equal(r.usuario.telefono, '71113333')
     const p = s.get().publicaciones.find((x) => x.id === 'pub-a')
     assert.equal(p.empresa, 'Imprenta Luis SRL')
-    assert.equal(p.telefono, '71113333')
+    assert.equal(telefonoEnHoja('pub-a'), '71113333')
   })
   prueba('al cerrar sesión la llave deja de servir', () => {
     s.post('cerrar_sesion', {}, tokenAna)
     assert.equal(s.post('mi_actividad', {}, tokenAna).codigo, 'sesion_invalida')
   })
   prueba('una sesión vencida no sirve', () => {
-    const sesiones = hoja('Sesiones')
+    const sesiones = privada('Sesiones')
     const fila = sesiones.find((f) => f[0] === tokenLuis)
     fila[3] = Date.now() - 1000
     assert.equal(s.post('mi_actividad', {}, tokenLuis).codigo, 'sesion_invalida')
@@ -312,8 +367,7 @@ if (CODIGO) {
     const r = s.post('iniciar_sesion', { correo: 'imprenta@ejemplo.test', clave: CLAVE_IMPRENTA })
     const cambio = s.post('actualizar_perfil', { empresa: 'Imprenta Prueba', contacto: 'Melisa Prueba', telefono: '70000012', tipo: 'ambos', zonaInteres: 'DM-5' }, r.token)
     assert.equal(cambio.ok, true, JSON.stringify(cambio))
-    assert.equal(hoja('Recolectores').filter((f) => f[9] === 'usr-imprenta').length, 0)
-    assert.equal(hoja('Ambos').filter((f) => f[9] === 'usr-imprenta').length, 1)
+    assert.equal(cuentaEnRespuestas('usr-imprenta')[3], 'ambos', 'la vista Ambos la muestra sola')
     assert.equal(s.post('iniciar_sesion', { correo: 'imprenta@ejemplo.test', clave: CLAVE_IMPRENTA }).usuario.tipo, 'ambos')
   })
   prueba('una acción desconocida se rechaza', () => {
@@ -322,7 +376,7 @@ if (CODIGO) {
 
   console.log('\nRecuperar la contraseña')
   const ultimoCodigo = () => s.correos.at(-1).subject.match(/(\d{6})$/)[1]
-  const filaRecuperacion = (correo) => hoja('Recuperaciones').filter((f) => f[0] === correo).at(-1)
+  const filaRecuperacion = (correo) => privada('Recuperaciones').filter((f) => f[0] === correo).at(-1)
 
   prueba('con un correo que no existe responde igual y no manda nada', () => {
     const antes = s.correos.length
@@ -400,7 +454,7 @@ if (CODIGO) {
     // El hash del código en base64 empieza con "+" una de cada 64 veces; sin
     // seguro() Sheets lo tomaría como fórmula y el código nunca coincidiría.
     for (let i = 0; i < 200; i++) {
-      hoja('Recuperaciones').forEach((fila, n) => {
+      privada('Recuperaciones').forEach((fila, n) => {
         if (n > 0) fila[3] = '2000-01-01T00:00:00.000Z' // fuera del límite por hora
       })
       assert.equal(s.post('solicitar_recuperacion', { correo: 'mendez@ejemplo.test' }).ok, true)
@@ -426,6 +480,10 @@ if (CODIGO) {
     const r = s.post('admin_datos', { clave: 'clave-admin-prueba' })
     assert.equal(r.ok, true, JSON.stringify(r))
     assert.equal(r.usuarios.length, 5)
+    const ana = r.usuarios.find((u) => u.correo === 'ana@ejemplo.test')
+    assert.equal(ana.lugar, 'DM-3')
+    assert.equal(ana.fechaServicio, '15/11/2026')
+    assert.match(ana.mensaje, /cartón/)
     assert.ok(r.usuarios.every((u) => u.hashClave === undefined && u.sal === undefined), 'nunca el hash')
     const pollos = r.usuarios.find((u) => u.id === 'usr-viejo-1')
     assert.equal(pollos.fecha, '23/09/2026')
@@ -483,7 +541,7 @@ if (CODIGO) {
     assert.match(p.creadaEn, /^\d{4}-\d{2}-\d{2}T/)
   })
   prueba('la versión del script se puede consultar', () => {
-    assert.equal(s.get('estado').version, 5)
+    assert.equal(s.get('estado').version, 6)
   })
 
   console.log(`\n${pasadas} pruebas pasaron${process.exitCode ? ', hay fallas' : ''}.`)

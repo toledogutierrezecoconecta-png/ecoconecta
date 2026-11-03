@@ -24,6 +24,12 @@ export interface UsuarioAdmin {
   fecha: string
   hora: string
   correoConfirmacion: string
+  /** Zona donde opera (columna Lugar de Respuestas). */
+  lugar: string
+  /** Fecha estimada de la primera entrega o recolección, "dd/MM/yyyy". */
+  fechaServicio: string
+  /** Qué materiales genera o busca. */
+  mensaje: string
 }
 
 export interface PublicacionAdmin {
