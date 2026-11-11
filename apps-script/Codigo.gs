@@ -1914,3 +1914,161 @@ function corregirRespuestas() {
 
   Logger.log('Respuestas ordenada y con formato: ' + (ultima - 1) + ' cuentas.')
 }
+
+// ================================================= empresas de muestra (SCZ)
+
+/**
+ * Empresas y publicaciones de muestra de Santa Cruz para que el marketplace
+ * se vea con movimiento. Los negocios son inventados: el teléfono es el del
+ * proyecto (WhatsApp de soporte) y el correo, un alias del correo del
+ * proyecto (+ej01, +ej02…), así se reconocen en la hoja y nadie le escribe
+ * a un número ajeno. No tienen contraseña: no se puede ingresar con ellas.
+ *
+ *   cargarEmpresasDeMuestra()  agrega las que falten (se puede repetir).
+ *   marcarComoEjemplo()        sus publicaciones muestran «Publicación de ejemplo».
+ *   marcarComoReales()         se muestran como publicaciones comunes.
+ */
+var CORREO_MUESTRAS = 'toledogutierrezecoconecta+ej'
+var TELEFONO_MUESTRAS = '78906939'
+
+var EMPRESAS_MUESTRA = [
+  { n: '01', empresa: 'Restaurante Sabor Camba', contacto: 'Carla Rojas', tipo: 'oferente', zona: 'DM-2', mensaje: 'Generamos aceite de freidora y descarte de verduras de la cocina todos los días.' },
+  { n: '02', empresa: 'Cafetería Grano Oriental', contacto: 'Diego Suárez', tipo: 'oferente', zona: 'DM-1', mensaje: 'Tenemos posos de café de la máquina espresso para compost o abono.' },
+  { n: '03', empresa: 'Distribuidora Frutas del Oriente', contacto: 'Rosa Vaca', tipo: 'oferente', zona: 'DM-3', mensaje: 'Fruta y verdura que ya no se vende en nuestro puesto del Mercado Abasto.' },
+  { n: '04', empresa: 'Gráfica Tropical', contacto: 'Marco Antelo', tipo: 'ambos', zona: 'DM-2', mensaje: 'Imprenta: generamos cartón y plástico de embalaje; buscamos pallets de madera.' },
+  { n: '05', empresa: 'Metalmecánica El Pari', contacto: 'Jorge Justiniano', tipo: 'oferente', zona: 'DM-4', mensaje: 'Recortes de fierro y viruta de torno del taller.' },
+  { n: '06', empresa: 'Confecciones Moda Cruceña', contacto: 'Patricia Melgar', tipo: 'oferente', zona: 'DM-7', mensaje: 'Retazos de tela de algodón y jean de la confección.' },
+  { n: '07', empresa: 'Distribuidora de Bebidas Norte', contacto: 'Luis Áñez', tipo: 'oferente', zona: 'DM-5', mensaje: 'Pallets, cartón y film plástico que salen del almacén.' },
+  { n: '08', empresa: 'Jardines del Piraí', contacto: 'Ramiro Flores', tipo: 'oferente', zona: 'DM-1', mensaje: 'Restos de poda del mantenimiento de jardines de condominios.' },
+  { n: '09', empresa: 'Acopio Reciclados Plan 3000', contacto: 'Mirtha Choque', tipo: 'recolector', zona: 'DM-8', mensaje: 'Compramos cartón, plástico y chatarra; retiramos con camioneta.' },
+  { n: '10', empresa: 'Biocombustibles del Oriente', contacto: 'Fernando Ribera', tipo: 'recolector', zona: 'DM-6', mensaje: 'Compramos aceite vegetal usado para producir biodiésel.' },
+  { n: '11', empresa: 'Compostera Tierra Viva', contacto: 'Ana Cuéllar', tipo: 'recolector', zona: 'DM-6', mensaje: 'Recibimos residuos orgánicos y poda para hacer compost.' },
+]
+
+/** v = valor estimado [mínimo, máximo] con la tabla de precios de la web ('' en donaciones). */
+var PUBLICACIONES_MUESTRA = [
+  { n: '01', titulo: 'Aceite vegetal usado de freidora', categoriaId: 'organicos', materialId: 'aceite-vegetal', cantidad: 60, unidad: 'litros', frecuencia: 'Semanal', zona: 'DM-2', direccion: 'Av. Banzer, entre 2do y 3er anillo', modalidadPrecio: 'referencia', v: [108, 150], descripcion: 'Aceite de freidora filtrado, en bidones de 20 litros con tapa. Retiro los lunes por la mañana.' },
+  { n: '01', titulo: 'Descarte de verduras de cocina', categoriaId: 'organicos', materialId: 'descarte-frutas', cantidad: 15, unidad: 'kg', frecuencia: 'Todos los días', zona: 'DM-2', direccion: 'Av. Banzer, entre 2do y 3er anillo', modalidadPrecio: 'donacion', v: ['', ''], descripcion: 'Cáscaras y recortes de verduras, sin carne ni grasa. Ideal para compost o alimento de animales. Retiro antes de las 10:00.' },
+  { n: '02', titulo: 'Posos de café de espresso', categoriaId: 'organicos', materialId: 'posos-cafe', cantidad: 25, unidad: 'kg', frecuencia: 'Semanal', zona: 'DM-1', direccion: 'Zona Equipetrol, cerca del 3er anillo', modalidadPrecio: 'donacion', v: ['', ''], descripcion: 'Posos de café secos, en bolsas de 5 kg. Sirven como abono o para compost.' },
+  { n: '03', titulo: 'Fruta y verdura de descarte', categoriaId: 'organicos', materialId: 'descarte-frutas', cantidad: 300, unidad: 'kg', frecuencia: 'Semanal', zona: 'DM-3', direccion: 'Mercado Abasto', modalidadPrecio: 'donacion', v: ['', ''], descripcion: 'Fruta y verdura madura que no se vende. Se entrega en cajas los sábados por la tarde.' },
+  { n: '04', titulo: 'Cartón de cajas de papel', categoriaId: 'secos', materialId: 'carton-prensado', cantidad: 400, unidad: 'kg', frecuencia: 'Mensual', zona: 'DM-2', direccion: 'Calle Warnes, 2do anillo', modalidadPrecio: 'referencia', v: [320, 560], descripcion: 'Cajas de cartón desarmadas y atadas, secas y limpias. Se carga en nuestra puerta.' },
+  { n: '04', titulo: 'Plástico de embalaje', categoriaId: 'secos', materialId: 'retazos-plastico', cantidad: 50, unidad: 'kg', frecuencia: 'Mensual', zona: 'DM-2', direccion: 'Calle Warnes, 2do anillo', modalidadPrecio: 'referencia', v: [60, 100], descripcion: 'Film y bolsas de embalaje de resmas, limpios, en bolsas grandes.' },
+  { n: '05', titulo: 'Recortes de fierro y viruta', categoriaId: 'secos', materialId: 'chatarra-metalica', cantidad: 800, unidad: 'kg', frecuencia: 'Según acumulación', zona: 'DM-4', direccion: 'Av. Santos Dumont, 4to anillo', modalidadPrecio: 'referencia', v: [1200, 2240], descripcion: 'Recortes de planchas y perfiles de fierro, y viruta de torno. Se necesita vehículo de carga.' },
+  { n: '06', titulo: 'Retazos de algodón y jean', categoriaId: 'secos', materialId: 'retazos-textiles', cantidad: 120, unidad: 'kg', frecuencia: 'Quincenal', zona: 'DM-7', direccion: 'Villa 1ro de Mayo, cerca de la avenida principal', modalidadPrecio: 'referencia', v: [300, 420], descripcion: 'Retazos de tela separados por color, en bolsas. Sirven para relleno, trapos o hilado.' },
+  { n: '07', titulo: 'Pallets de madera', categoriaId: 'secos', materialId: 'pallets-madera', cantidad: 40, unidad: 'unidades', frecuencia: 'Mensual', zona: 'DM-5', direccion: 'Av. Banzer, después del 6to anillo', modalidadPrecio: 'referencia', v: [480, 720], descripcion: 'Pallets estándar, algunos con tablas sueltas. Retiro de lunes a viernes en horario de oficina.' },
+  { n: '07', titulo: 'Cartón prensado de almacén', categoriaId: 'secos', materialId: 'carton-prensado', cantidad: 600, unidad: 'kg', frecuencia: 'Semanal', zona: 'DM-5', direccion: 'Av. Banzer, después del 6to anillo', modalidadPrecio: 'referencia', v: [480, 840], descripcion: 'Cajas de bebidas prensadas en fardos. Se carga con montacargas.' },
+  { n: '07', titulo: 'Film stretch de pallets', categoriaId: 'secos', materialId: 'retazos-plastico', cantidad: 150, unidad: 'kg', frecuencia: 'Quincenal', zona: 'DM-5', direccion: 'Av. Banzer, después del 6to anillo', modalidadPrecio: 'referencia', v: [180, 300], descripcion: 'Film plástico transparente de envolver pallets, limpio y compactado en bolsas.' },
+  { n: '08', titulo: 'Restos de poda de condominios', categoriaId: 'organicos', materialId: 'restos-poda', cantidad: 2, unidad: 'm3', frecuencia: 'Quincenal', zona: 'DM-1', direccion: 'Zona oeste, cerca del 4to anillo', modalidadPrecio: 'donacion', v: ['', ''], descripcion: 'Ramas, hojas y césped cortado, sin basura. Ideal para compost o chipeado.' },
+]
+
+function correoMuestra(n) {
+  return CORREO_MUESTRAS + n + '@gmail.com'
+}
+
+/** Fecha "yyyy-MM-dd" dentro de `dias` días, en hora de Bolivia. */
+function fechaDentroDe(dias) {
+  return Utilities.formatDate(new Date(Date.now() + dias * 86400000), ZONA_HORARIA, 'yyyy-MM-dd')
+}
+
+/** Agrega a Respuestas y Publicaciones las empresas y publicaciones de muestra que falten. */
+function cargarEmpresasDeMuestra() {
+  var cuentasNuevas = 0
+  var cuentas = {}
+
+  EMPRESAS_MUESTRA.forEach(function (e) {
+    var correo = correoMuestra(e.n)
+    var existente = buscarCuenta('correo', correo)
+    if (existente) {
+      cuentas[e.n] = existente
+      return
+    }
+    var ahora = new Date()
+    var cuenta = {
+      fecha: ahora,
+      id: generarId('usr'),
+      empresa: e.empresa,
+      contacto: e.contacto,
+      telefono: TELEFONO_MUESTRAS,
+      correo: correo,
+      tipo: e.tipo,
+      creadoEn: ahora.toISOString(),
+      zonaInteres: e.zona,
+      fechaServicio: fechaDentroDe(7),
+      mensaje: e.mensaje,
+      correoConfirmacion: 'No se envía (carga de muestra)',
+    }
+    agregarCuenta(cuenta)
+    cuentas[e.n] = cuenta
+    cuentasNuevas++
+  })
+
+  var hoja = obtenerHoja(HOJA_PUBLICACIONES, COLUMNAS_PUBLICACIONES)
+  var existentes = leerFilas(hoja, COLUMNAS_PUBLICACIONES)
+  var publicacionesNuevas = 0
+
+  PUBLICACIONES_MUESTRA.forEach(function (p) {
+    var cuenta = cuentas[p.n]
+    var repetida = existentes.some(function (fila) {
+      return String(fila.usuarioId) === String(cuenta.id) && String(fila.titulo) === p.titulo
+    })
+    if (repetida) return
+
+    var datos = {
+      id: generarId('pub'),
+      titulo: p.titulo,
+      categoriaId: p.categoriaId,
+      materialId: p.materialId,
+      descripcion: p.descripcion,
+      cantidad: p.cantidad,
+      unidad: p.unidad,
+      frecuencia: p.frecuencia,
+      zona: p.zona,
+      direccion: p.direccion,
+      modalidadPrecio: p.modalidadPrecio,
+      valorEstimadoMin: p.v[0],
+      valorEstimadoMax: p.v[1],
+      fechaDisponible: fechaDentroDe(0),
+      estado: 'disponible',
+      creadaEn: new Date().toISOString(),
+    }
+    hoja.appendRow(filaDesdeObjeto(prepararPublicacion(datos, cuenta, null), COLUMNAS_PUBLICACIONES))
+    publicacionesNuevas++
+  })
+
+  var resumen =
+    'Empresas de muestra agregadas: ' + cuentasNuevas + ' (de ' + EMPRESAS_MUESTRA.length + '). ' +
+    'Publicaciones agregadas: ' + publicacionesNuevas + ' (de ' + PUBLICACIONES_MUESTRA.length + ').'
+  Logger.log(resumen)
+  return resumen
+}
+
+/** Cambia el Origen de las publicaciones de las empresas de muestra ('demo' o 'usuario'). */
+function cambiarOrigenMuestras(origen) {
+  var idsMuestra = {}
+  leerCuentas().forEach(function (cuenta) {
+    if (String(cuenta.correo).indexOf(CORREO_MUESTRAS) === 0) idsMuestra[String(cuenta.id)] = true
+  })
+
+  var hoja = obtenerHoja(HOJA_PUBLICACIONES, COLUMNAS_PUBLICACIONES)
+  var cambiadas = 0
+  leerFilas(hoja, COLUMNAS_PUBLICACIONES).forEach(function (publicacion) {
+    if (!idsMuestra[String(publicacion.usuarioId)] || publicacion.origen === origen) return
+    publicacion.origen = origen
+    escribirFila(hoja, publicacion._fila, publicacion, COLUMNAS_PUBLICACIONES)
+    cambiadas++
+  })
+
+  var resumen = 'Publicaciones de muestra con Origen "' + origen + '": ' + cambiadas + ' cambiadas.'
+  Logger.log(resumen)
+  return resumen
+}
+
+/** Las publicaciones de muestra se ven con la etiqueta «Publicación de ejemplo» y sin «Contactar». */
+function marcarComoEjemplo() {
+  return cambiarOrigenMuestras('demo')
+}
+
+/** Las publicaciones de muestra se ven como publicaciones comunes. */
+function marcarComoReales() {
+  return cambiarOrigenMuestras('usuario')
+}

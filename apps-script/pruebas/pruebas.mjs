@@ -544,5 +544,47 @@ if (CODIGO) {
     assert.equal(s.get('estado').version, 6)
   })
 
+  console.log('\nEmpresas de muestra de Santa Cruz')
+  const esMuestra = (p) => p.empresa && hoja('Respuestas').some((f) => f[7] === p.empresa && String(f[2]).startsWith('toledogutierrezecoconecta+ej'))
+  const muestrasPublicas = () => s.get().publicaciones.filter(esMuestra)
+  prueba('cargarEmpresasDeMuestra agrega 11 empresas y 12 publicaciones sin mandar correos', () => {
+    const cuentasAntes = hoja('Respuestas').length
+    const correosAntes = s.correos.length
+    const resumen = s.ejecutar('cargarEmpresasDeMuestra')
+    assert.match(resumen, /Empresas de muestra agregadas: 11 \(de 11\)/)
+    assert.match(resumen, /Publicaciones agregadas: 12 \(de 12\)/)
+    assert.equal(hoja('Respuestas').length, cuentasAntes + 11)
+    assert.equal(s.correos.length, correosAntes, 'no se envía ningún correo')
+    const camba = hoja('Respuestas').find((f) => f[7] === 'Restaurante Sabor Camba')
+    assert.deepEqual([...camba.slice(1, 5)], ['Carla Rojas', 'toledogutierrezecoconecta+ej01@gmail.com', 'oferente', 'DM-2'])
+    assert.equal(camba[8], '78906939')
+    assert.equal(camba[9], 'No se envía (carga de muestra)')
+  })
+  prueba('se ven como publicaciones comunes, con el teléfono del proyecto', () => {
+    const lista = muestrasPublicas()
+    assert.equal(lista.length, 12)
+    assert.ok(lista.every((p) => p.origen === 'usuario' && p.estado === 'disponible'))
+    const aceite = lista.find((p) => p.titulo === 'Aceite vegetal usado de freidora')
+    assert.equal(aceite.telefono, undefined, 'la lista pública no trae teléfonos')
+    assert.equal(s.post('datos_contacto', { id: aceite.id }).telefono, '78906939')
+  })
+  prueba('repetir la carga no duplica nada', () => {
+    assert.match(s.ejecutar('cargarEmpresasDeMuestra'), /agregadas: 0 \(de 11\).*agregadas: 0 \(de 12\)/)
+    assert.equal(muestrasPublicas().length, 12)
+  })
+  prueba('las cuentas de muestra no permiten iniciar sesión', () => {
+    const r = s.post('iniciar_sesion', { correo: 'toledogutierrezecoconecta+ej01@gmail.com', clave: 'cualquiera' })
+    assert.equal(r.ok, false)
+  })
+  prueba('marcarComoEjemplo y marcarComoReales cambian solo las de muestra', () => {
+    const otras = () => s.get().publicaciones.filter((p) => !esMuestra(p)).map((p) => p.origen).join()
+    const antes = otras()
+    assert.match(s.ejecutar('marcarComoEjemplo'), /"demo": 12 cambiadas/)
+    assert.ok(muestrasPublicas().every((p) => p.origen === 'demo'))
+    assert.equal(otras(), antes)
+    assert.match(s.ejecutar('marcarComoReales'), /"usuario": 12 cambiadas/)
+    assert.ok(muestrasPublicas().every((p) => p.origen === 'usuario'))
+  })
+
   console.log(`\n${pasadas} pruebas pasaron${process.exitCode ? ', hay fallas' : ''}.`)
 }
