@@ -1891,3 +1891,26 @@ function normalizarTelefono(valor) {
 function verEnlaceDeLaHoja() {
   Logger.log(SpreadsheetApp.getActiveSpreadsheet().getUrl())
 }
+
+/**
+ * Ordena Respuestas por Marca temporal (la más antigua arriba) y aplica
+ * los formatos, notas y negrita de los títulos. Ejecutar UNA vez.
+ */
+function corregirRespuestas() {
+  var hoja = hojaRespuestas()
+  var ultima = hoja.getLastRow()
+
+  // Formatos de fecha y hora, teléfonos como texto, notas en los títulos.
+  prepararColumnas(hoja, COLUMNAS_RESPUESTAS, 1)
+  hoja.getRange(1, 1, 1, COLUMNAS_RESPUESTAS.length).setFontWeight('bold')
+  hoja.setFrozenRows(1)
+
+  // Orden cronológico: la cuenta más antigua arriba, la más nueva abajo.
+  if (ultima > 2) {
+    hoja
+      .getRange(2, 1, ultima - 1, COLUMNAS_RESPUESTAS.length)
+      .sort({ column: 1, ascending: true })
+  }
+
+  Logger.log('Respuestas ordenada y con formato: ' + (ultima - 1) + ' cuentas.')
+}
