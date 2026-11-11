@@ -19,6 +19,7 @@ const PUBLICOS: Enlace[] = [
   { a: '/publicar', texto: 'Publicar' },
   { a: '/precios', texto: 'Precios' },
   { a: '/como-funciona', texto: 'Cómo funciona' },
+  { a: '/ayuda', texto: 'Ayuda' },
 ]
 
 /** El menú de quien tiene sesión depende de si publica, busca o hace las dos cosas. */
@@ -29,6 +30,7 @@ function enlacesPrivados(tipo: TipoUsuario): Enlace[] {
     { a: '/panel', texto: tipo === 'oferente' ? 'Mis publicaciones' : 'Mi panel' },
     { a: '/precios', texto: 'Precios' },
     { a: '/perfil', texto: 'Mi perfil' },
+    { a: '/ayuda', texto: 'Ayuda' },
   ]
 }
 
@@ -87,7 +89,7 @@ export function Navbar() {
   }
 
   const clasesEnlace = ({ isActive }: { isActive: boolean }) =>
-    `rounded-lg px-3 py-2 text-[15px] font-semibold transition-colors ${
+    `rounded-lg px-2.5 py-2 text-sm font-semibold whitespace-nowrap transition-colors xl:px-3 xl:text-[15px] ${
       isActive ? 'bg-marca-50 text-marca-700' : 'text-humo-600 hover:bg-humo-100 hover:text-humo-800'
     }`
 

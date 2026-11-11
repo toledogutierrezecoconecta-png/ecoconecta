@@ -6,6 +6,7 @@ import { AvisoBienvenida } from './components/panel/AvisoBienvenida'
 import { ProveedorAuth } from './hooks/useAuth'
 import { Acceso } from './pages/Acceso'
 import { Admin } from './pages/Admin'
+import { Ayuda } from './pages/Ayuda'
 import { ComoFunciona } from './pages/ComoFunciona'
 import { DetalleResiduo } from './pages/DetalleResiduo'
 import { Explorar } from './pages/Explorar'
@@ -64,6 +65,7 @@ export default function App() {
               <Route path="/perfil" element={<Perfil />} />
               <Route path="/como-funciona" element={<ComoFunciona />} />
               <Route path="/precios" element={<Precios />} />
+              <Route path="/ayuda" element={<Ayuda />} />
               <Route path="/terminos" element={<Terminos />} />
               <Route path="/privacidad" element={<Privacidad />} />
               {/* Sin enlace público: se entra escribiendo /#/admin y pide la clave. */}

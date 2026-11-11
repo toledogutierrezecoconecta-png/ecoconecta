@@ -4,6 +4,7 @@ import { Icono } from '../ui/Icono'
 import logo from '../../assets/marca/logo.webp'
 
 const ENLACES = [
+  { a: '/ayuda', texto: 'Ayuda y manual de uso' },
   { a: '/como-funciona', texto: 'Cómo funciona' },
   { a: '/precios', texto: 'Cómo definimos los precios' },
   { a: '/como-funciona#quienes', texto: 'Sobre nosotros' },
